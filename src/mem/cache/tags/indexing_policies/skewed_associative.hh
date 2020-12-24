@@ -107,7 +107,7 @@ class SkewedAssociative : public BaseIndexingPolicy
 
     /**
      * Address skewing function selection. It selects and applies one of the
-     * skewing functions functions based on the way provided.
+     * skewing functions based on the way provided.
      *
      * @param addr Address to be skewed. Should contain the set and tag bits.
      * @param way The cache way, used to select a hash function.

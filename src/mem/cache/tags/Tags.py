@@ -82,6 +82,21 @@ class BaseSetAssoc(BaseTags):
     replacement_policy = Param.BaseReplacementPolicy(
         Parent.replacement_policy, "Replacement policy")
 
+class SkewedAssoc(BaseTags):
+    type = 'SkewedAssoc'
+    cxx_header = "mem/cache/tags/skewed_assoc.hh"
+
+    # Get the cache associativity
+    assoc = Param.Int(Parent.assoc, "associativity")
+
+    # Get replacement policy from the parent (cache)
+    replacement_policy = Param.BaseReplacementPolicy(
+        Parent.replacement_policy, "Replacement policy")
+
+    # Get indexing policy
+    indexing_policy = Param.BaseIndexingPolicy(
+        SkewedAssociative(),"Indexing policy")
+
 class SectorTags(BaseTags):
     type = 'SectorTags'
     cxx_header = "mem/cache/tags/sector_tags.hh"

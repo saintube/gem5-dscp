@@ -59,6 +59,7 @@
 NoncoherentCache::NoncoherentCache(const NoncoherentCacheParams *p)
     : BaseCache(p, p->system->cacheLineSize())
 {
+    tags->tagsInit();
 }
 
 void

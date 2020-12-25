@@ -154,3 +154,13 @@ class NoncoherentCache(BaseCache):
     # writebacks would be unnecessary traffic to the main memory.
     writeback_clean = False
 
+
+class SkewedCache(BaseCache):
+    type = 'SkewedCache'
+    cxx_header = 'mem/cache/skewed_cache.hh'
+
+    # Reset skewed-based tags and replacement policy for
+    # individual configuration.
+    replacement_policy = Param.BaseReplacementPolicy(RandomRP(),
+        "Replacement policy")
+    tags = Param.BaseTags(SkewedAssoc(), "Tag store")

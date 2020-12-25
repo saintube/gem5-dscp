@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2020 saintube
 # Copyright (c) 2015 Jason Power
 # All rights reserved.
 #
@@ -37,6 +38,7 @@ from __future__ import absolute_import
 
 import m5
 from m5.objects import Cache
+from m5.objects import SkewedCache
 
 # Add the common scripts to our path
 m5.util.addToPath('../../')
@@ -107,8 +109,8 @@ class L1DCache(L1Cache):
         """Connect this cache's port to a CPU dcache port"""
         self.cpu_side = cpu.dcache_port
 
-class L2Cache(Cache):
-    """Simple L2 Cache with default values"""
+class L2Cache(SkewedCache):
+    """Skewed-based L2 Cache with default values"""
 
     # Default parameters
     size = '256kB'

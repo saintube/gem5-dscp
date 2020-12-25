@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2020-2021 saintube Limited
  * Copyright (c) 2010-2019 ARM Limited
  * All rights reserved.
  *
@@ -44,7 +45,7 @@
  * Cache definitions.
  */
 
-#include "mem/cache/cache.hh"
+#include "mem/cache/skewed_cache.hh"
 
 #include <cassert>
 
@@ -61,23 +62,24 @@
 #include "mem/cache/tags/base.hh"
 #include "mem/cache/write_queue_entry.hh"
 #include "mem/request.hh"
-#include "params/Cache.hh"
+#include "params/SkewedCache.hh"
 
-Cache::Cache(const CacheParams *p)
+SkewedCache::SkewedCache(const SkewedCacheParams *p)
     : BaseCache(p, p->system->cacheLineSize()),
       doFastWrites(true)
 {
+    tags = p->tags;
     tags->tagsInit();
 }
 
 void
-Cache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
+SkewedCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
                       bool deferred_response, bool pending_downgrade)
 {
     BaseCache::satisfyRequest(pkt, blk);
 
     if (pkt->isRead()) {
-        // determine if this read is from a (coherent) cache or not
+        // determine if this read is from a (coherent) skewed cache or not
         if (pkt->fromCache()) {
             assert(pkt->getSize() == blkSize);
             // special handling for coherent block requests from
@@ -154,7 +156,7 @@ Cache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
 /////////////////////////////////////////////////////
 
 bool
-Cache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
+SkewedCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
               PacketList &writebacks)
 {
 
@@ -183,7 +185,7 @@ Cache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 }
 
 void
-Cache::doWritebacks(PacketList& writebacks, Tick forward_time)
+SkewedCache::doWritebacks(PacketList& writebacks, Tick forward_time)
 {
     while (!writebacks.empty()) {
         PacketPtr wbPkt = writebacks.front();
@@ -225,7 +227,7 @@ Cache::doWritebacks(PacketList& writebacks, Tick forward_time)
 }
 
 void
-Cache::doWritebacksAtomic(PacketList& writebacks)
+SkewedCache::doWritebacksAtomic(PacketList& writebacks)
 {
     while (!writebacks.empty()) {
         PacketPtr wbPkt = writebacks.front();
@@ -260,7 +262,7 @@ Cache::doWritebacksAtomic(PacketList& writebacks)
 
 
 void
-Cache::recvTimingSnoopResp(PacketPtr pkt)
+SkewedCache::recvTimingSnoopResp(PacketPtr pkt)
 {
     DPRINTF(Cache, "%s for %s\n", __func__, pkt->print());
 
@@ -271,7 +273,7 @@ Cache::recvTimingSnoopResp(PacketPtr pkt)
         outstandingSnoop.end();
 
     if (!forwardAsSnoop) {
-        // the packet came from this cache, so sink it here and do not
+        // the packet came from this skewed cache, so sink it here and do not
         // forward it
         assert(pkt->cmd == MemCmd::HardPFResp);
 
@@ -294,7 +296,7 @@ Cache::recvTimingSnoopResp(PacketPtr pkt)
 }
 
 void
-Cache::promoteWholeLineWrites(PacketPtr pkt)
+SkewedCache::promoteWholeLineWrites(PacketPtr pkt)
 {
     // Cache line clearing instructions
     if (doFastWrites && (pkt->cmd == MemCmd::WriteReq) &&
@@ -306,7 +308,8 @@ Cache::promoteWholeLineWrites(PacketPtr pkt)
 }
 
 void
-Cache::handleTimingReqHit(PacketPtr pkt, CacheBlk *blk, Tick request_time)
+SkewedCache::handleTimingReqHit(PacketPtr pkt, CacheBlk *blk,
+                            Tick request_time)
 {
     // should never be satisfying an uncacheable access as we
     // flush and invalidate any existing block as part of the
@@ -317,8 +320,8 @@ Cache::handleTimingReqHit(PacketPtr pkt, CacheBlk *blk, Tick request_time)
 }
 
 void
-Cache::handleTimingReqMiss(PacketPtr pkt, CacheBlk *blk, Tick forward_time,
-                           Tick request_time)
+SkewedCache::handleTimingReqMiss(PacketPtr pkt, CacheBlk *blk,
+                            Tick forward_time, Tick request_time)
 {
     if (pkt->req->isUncacheable()) {
         // ignore any existing MSHR if we are dealing with an
@@ -396,7 +399,7 @@ Cache::handleTimingReqMiss(PacketPtr pkt, CacheBlk *blk, Tick forward_time,
 }
 
 void
-Cache::recvTimingReq(PacketPtr pkt)
+SkewedCache::recvTimingReq(PacketPtr pkt)
 {
     DPRINTF(CacheTags, "%s tags:\n%s\n", __func__, tags->print());
 
@@ -470,7 +473,7 @@ Cache::recvTimingReq(PacketPtr pkt)
 }
 
 PacketPtr
-Cache::createMissPacket(PacketPtr cpu_pkt, CacheBlk *blk,
+SkewedCache::createMissPacket(PacketPtr cpu_pkt, CacheBlk *blk,
                         bool needsWritable,
                         bool is_whole_line_write) const
 {
@@ -556,7 +559,7 @@ Cache::createMissPacket(PacketPtr cpu_pkt, CacheBlk *blk,
 
 
 Cycles
-Cache::handleAtomicReqMiss(PacketPtr pkt, CacheBlk *&blk,
+SkewedCache::handleAtomicReqMiss(PacketPtr pkt, CacheBlk *&blk,
                            PacketList &writebacks)
 {
     // deal with the packets that go through the write path of
@@ -648,7 +651,7 @@ Cache::handleAtomicReqMiss(PacketPtr pkt, CacheBlk *&blk,
 }
 
 Tick
-Cache::recvAtomic(PacketPtr pkt)
+SkewedCache::recvAtomic(PacketPtr pkt)
 {
     promoteWholeLineWrites(pkt);
 
@@ -679,7 +682,7 @@ Cache::recvAtomic(PacketPtr pkt)
 
 
 void
-Cache::serviceMSHRTargets(MSHR *mshr, const PacketPtr pkt, CacheBlk *blk)
+SkewedCache::serviceMSHRTargets(MSHR *mshr, const PacketPtr pkt, CacheBlk *blk)
 {
     QueueEntry::Target *initial_tgt = mshr->getTarget();
     // First offset for critical word first calculations
@@ -895,7 +898,7 @@ Cache::serviceMSHRTargets(MSHR *mshr, const PacketPtr pkt, CacheBlk *blk)
 }
 
 PacketPtr
-Cache::evictBlock(CacheBlk *blk)
+SkewedCache::evictBlock(CacheBlk *blk)
 {
     PacketPtr pkt = (blk->isDirty() || writebackClean) ?
         writebackBlk(blk) : cleanEvictBlk(blk);
@@ -906,7 +909,7 @@ Cache::evictBlock(CacheBlk *blk)
 }
 
 PacketPtr
-Cache::cleanEvictBlk(CacheBlk *blk)
+SkewedCache::cleanEvictBlk(CacheBlk *blk)
 {
     assert(!writebackClean);
     assert(blk && blk->isValid() && !blk->isDirty());
@@ -934,7 +937,7 @@ Cache::cleanEvictBlk(CacheBlk *blk)
 /////////////////////////////////////////////////////
 
 void
-Cache::doTimingSupplyResponse(PacketPtr req_pkt, const uint8_t *blk_data,
+SkewedCache::doTimingSupplyResponse(PacketPtr req_pkt, const uint8_t *blk_data,
                               bool already_copied, bool pending_inval)
 {
     // sanity check
@@ -979,7 +982,7 @@ Cache::doTimingSupplyResponse(PacketPtr req_pkt, const uint8_t *blk_data,
 }
 
 uint32_t
-Cache::handleSnoop(PacketPtr pkt, CacheBlk *blk, bool is_timing,
+SkewedCache::handleSnoop(PacketPtr pkt, CacheBlk *blk, bool is_timing,
                    bool is_deferred, bool pending_inval)
 {
     DPRINTF(CacheVerbose, "%s: for %s\n", __func__, pkt->print());
@@ -1057,7 +1060,8 @@ Cache::handleSnoop(PacketPtr pkt, CacheBlk *blk, bool is_timing,
         if (blk_valid && blk->isDirty()) {
             DPRINTF(CacheVerbose, "%s: packet (snoop) %s found block: %s\n",
                     __func__, pkt->print(), blk->print());
-            PacketPtr wb_pkt = writecleanBlk(blk, pkt->req->getDest(), pkt->id);
+            PacketPtr wb_pkt = writecleanBlk(blk, pkt->req->getDest(),
+                    pkt->id);
             PacketList writebacks;
             writebacks.push_back(wb_pkt);
 
@@ -1192,7 +1196,7 @@ Cache::handleSnoop(PacketPtr pkt, CacheBlk *blk, bool is_timing,
 
 
 void
-Cache::recvTimingSnoopReq(PacketPtr pkt)
+SkewedCache::recvTimingSnoopReq(PacketPtr pkt)
 {
     DPRINTF(CacheVerbose, "%s: for %s\n", __func__, pkt->print());
 
@@ -1310,7 +1314,7 @@ Cache::recvTimingSnoopReq(PacketPtr pkt)
 }
 
 Tick
-Cache::recvAtomicSnoop(PacketPtr pkt)
+SkewedCache::recvAtomicSnoop(PacketPtr pkt)
 {
     // no need to snoop requests that are not in range.
     if (!inRange(pkt->getAddr())) {
@@ -1323,7 +1327,7 @@ Cache::recvAtomicSnoop(PacketPtr pkt)
 }
 
 bool
-Cache::isCachedAbove(PacketPtr pkt, bool is_timing)
+SkewedCache::isCachedAbove(PacketPtr pkt, bool is_timing)
 {
     if (!forwardSnoops)
         return false;
@@ -1351,7 +1355,7 @@ Cache::isCachedAbove(PacketPtr pkt, bool is_timing)
 }
 
 bool
-Cache::sendMSHRQueuePacket(MSHR* mshr)
+SkewedCache::sendMSHRQueuePacket(MSHR* mshr)
 {
     assert(mshr);
 
@@ -1428,11 +1432,11 @@ Cache::sendMSHRQueuePacket(MSHR* mshr)
     return BaseCache::sendMSHRQueuePacket(mshr);
 }
 
-Cache*
-CacheParams::create()
+SkewedCache*
+SkewedCacheParams::create()
 {
     assert(tags);
     assert(replacement_policy);
 
-    return new Cache(this);
+    return new SkewedCache(this);
 }

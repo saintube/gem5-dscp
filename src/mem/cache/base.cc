@@ -118,7 +118,8 @@ BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
 
     tempBlock = new TempCacheBlk(blkSize);
 
-    tags->tagsInit();
+    // NOTE: move tagsInit() into sub-classes' initialization
+
     if (prefetcher)
         prefetcher->setCache(this);
 }

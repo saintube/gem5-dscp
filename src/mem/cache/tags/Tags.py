@@ -95,7 +95,7 @@ class SkewedAssoc(BaseTags):
 
     # Get indexing policy
     indexing_policy = Param.BaseIndexingPolicy(
-        SkewedAssociative(),"Indexing policy")
+        ScatterAssociative(),"Indexing policy")
 
 class SectorTags(BaseTags):
     type = 'SectorTags'

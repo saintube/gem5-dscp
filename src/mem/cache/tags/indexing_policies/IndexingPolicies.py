@@ -51,3 +51,8 @@ class SkewedAssociative(BaseIndexingPolicy):
     type = 'SkewedAssociative'
     cxx_class = 'SkewedAssociative'
     cxx_header = "mem/cache/tags/indexing_policies/skewed_associative.hh"
+
+class ScatterAssociative(BaseIndexingPolicy):
+    type = 'ScatterAssociative'
+    cxx_class = 'ScatterAssociative'
+    cxx_header = "mem/cache/tags/indexing_policies/scatter_associative.hh"

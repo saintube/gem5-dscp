@@ -47,12 +47,53 @@
 #ifndef __MEM_CACHE_INDEXING_POLICIES_BASE_HH__
 #define __MEM_CACHE_INDEXING_POLICIES_BASE_HH__
 
+#include <map>
 #include <vector>
 
 #include "params/BaseIndexingPolicy.hh"
 #include "sim/sim_object.hh"
 
 class ReplaceableEntry;
+class PLC;
+
+/**
+ * A auxiliary class for partitioned indexing table locations. Notice
+ * that PLC is full-associative and has its replacement policy.
+ */
+class PLC
+{
+  private:
+    /**
+     * The capacity for PLC lines.
+     */
+    unsigned capacity;
+
+    /**
+     * The tag shift in PLC.
+     */
+    unsigned tagShift;
+
+  public:
+    /**
+     * Maitaining the hashing between partition owners and sector id.
+     */
+    std::map<unsigned, int> m;
+
+    /**
+     * Construct and initialize this policy.
+     */
+    PLC(unsigned size, unsigned shift);
+
+    /**
+     * Destructor.
+     */
+    ~PLC() {};
+
+    /**
+     * getSize returns the capacity of PLC.
+     */
+    unsigned getCapacity();
+};
 
 /**
  * A common base class for indexing table locations. Classes that inherit
@@ -93,7 +134,18 @@ class BaseIndexingPolicy : public SimObject
      */
     const int tagShift;
 
+    /**
+     * The number of partition lookup cache lines.
+     */
+    const int plc_size;
+
+    /**
+     * The partition lookup cache for partitioned indexing.
+     */
+    PLC* plc;
+
   public:
+
     /**
      * Convenience typedef.
      */
@@ -155,6 +207,25 @@ class BaseIndexingPolicy : public SimObject
      */
     virtual Addr regenerateAddr(const Addr tag, const ReplaceableEntry* entry)
                                                                     const = 0;
+
+    /**
+     * getSector returns the sector id of PLC. It returns -1 if no
+     * mapping for the given addr.
+     *
+     * @param addr The entry's address.
+     * @return the sector id.
+     */
+    int getSector(const Addr addr) const;
+
+    /**
+     * setSector sets the address field of given addr mapping to
+     * given sector id.
+     *
+     * @param addr The entry's address.
+     * @param the sector id.
+     * @return whether the mapping changed or not.
+     */
+    bool setSector(const Addr addr, int secId);
 };
 
 #endif //__MEM_CACHE_INDEXING_POLICIES_BASE_HH__

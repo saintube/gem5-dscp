@@ -56,7 +56,8 @@ BaseIndexingPolicy::BaseIndexingPolicy(const Params *p)
     : SimObject(p), assoc(p->assoc),
       numSets(p->size / (p->entry_size * assoc)),
       setShift(floorLog2(p->entry_size)), setMask(numSets - 1), sets(numSets),
-      tagShift(setShift + floorLog2(numSets))
+      tagShift(setShift + floorLog2(numSets)), plc_size(10)
+      // TODO: set an approriate shift for the plc
 {
     fatal_if(!isPowerOf2(numSets), "# of sets must be non-zero and a power " \
              "of 2");
@@ -66,6 +67,11 @@ BaseIndexingPolicy::BaseIndexingPolicy(const Params *p)
     for (uint32_t i = 0; i < numSets; ++i) {
         sets[i].resize(assoc);
     }
+
+    // TODO: initialize the plc
+    fatal_if(plc_size < 0, "plc size must be no less than zero");
+    fatal_if(tagShift < 0, "tagShift must be no less than zero");
+    plc = new PLC((unsigned)plc_size, (unsigned)tagShift);
 }
 
 ReplaceableEntry*
@@ -96,4 +102,37 @@ Addr
 BaseIndexingPolicy::extractTag(const Addr addr) const
 {
     return (addr >> tagShift);
+}
+
+PLC::PLC(unsigned size, unsigned shift)
+{
+    capacity = size;
+    tagShift = shift;
+};
+
+unsigned
+PLC::getCapacity()
+{
+    return capacity;
+}
+
+int
+BaseIndexingPolicy::getSector(const Addr addr) const
+{
+    unsigned addrField = (addr >> tagShift);
+    if (plc->m.count(addrField)) {
+        return plc->m[addrField];
+    }
+    return -1;
+}
+
+bool
+BaseIndexingPolicy::setSector(const Addr addr, int secId)
+{
+    unsigned addrField = addr >> tagShift;
+    if (plc->m[addrField] == secId) {
+        return false;
+    }
+    plc->m[addrField] = secId;
+    return true;
 }

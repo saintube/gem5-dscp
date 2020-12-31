@@ -56,6 +56,8 @@ ScatterAssociative::ScatterAssociative(const Params *p)
     // We must have more than two sets, otherwise the MSB and LSB are the same
     // bit, and the xor of them will always be 0
     fatal_if(numSets <= 2, "The number of sets must be greater than 2");
+
+    fatal_if(plc_size <= 0, "The size of PLC must be larger than 0");
 }
 
 Addr
@@ -88,6 +90,9 @@ ScatterAssociative::dehash(const Addr addr) const
 Addr
 ScatterAssociative::scatter(const Addr addr, const uint32_t way) const
 {
+    // TODO: hash with sector id from the PLC.
+    int secId = getSector(addr);
+
     // Assume an address of size A bits can be decomposed into
     // {addr3, addr2, addr1, addr0}, where:
     //   addr0 (M bits) = Block offset;

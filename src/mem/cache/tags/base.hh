@@ -99,6 +99,9 @@ class BaseTags : public ClockedObject
     /** The data blocks, 1 per cache block. */
     std::unique_ptr<uint8_t[]> dataBlks;
 
+    /** The number of partitioning sectors */
+    unsigned numPSectors;
+
     /**
      * TODO: It would be good if these stats were acquired after warmup.
      */
@@ -152,6 +155,11 @@ class BaseTags : public ClockedObject
         Stats::Scalar tagAccesses;
         /** Number of data blocks consulted over all accesses. */
         Stats::Scalar dataAccesses;
+
+        /** The total contribution of the cache. */
+        Stats::Scalar totalContribution;
+        /** The contribution of each partitioning sector. */
+        Stats::Vector contributions;
     } stats;
 
   public:

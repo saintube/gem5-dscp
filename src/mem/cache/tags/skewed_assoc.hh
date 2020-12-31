@@ -49,6 +49,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -146,6 +147,12 @@ class SkewedAssoc : public BaseTags
 
             // Update replacement data of accessed block
             replacementPolicy->touch(blk->replacementData);
+
+            // Contribution always increases once an hit.
+            stats.totalContribution += 1;
+            stats.contributions[blk->getSet() % numPSectors] += 1;
+        } else {
+            // TODO: For a miss, reset the contribution if needed.
         }
 
         // The tag lookup latency is the same for a hit or a miss

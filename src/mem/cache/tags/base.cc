@@ -62,9 +62,14 @@ BaseTags::BaseTags(const Params *p)
       warmupBound((p->warmup_percentage/100.0) * (p->size / p->block_size)),
       warmedUp(false), numBlocks(p->size / p->block_size),
       dataBlks(new uint8_t[p->size]), // Allocate data storage in one big chunk
+      numPSectors(numBlocks >> 8),
       stats(*this)
 {
     registerExitCallback([this]() { cleanupRefs(); });
+
+    // Ensure the number of partitioned sectors should be larger than zero.
+    if (numPSectors <= 0)
+        numPSectors = 1;
 }
 
 ReplaceableEntry*
@@ -122,6 +127,7 @@ BaseTags::insertBlock(const PacketPtr pkt, CacheBlk *blk)
     // We only need to write into one tag and one data block.
     stats.tagAccesses += 1;
     stats.dataAccesses += 1;
+
 }
 
 Addr
@@ -224,7 +230,9 @@ BaseTags::BaseTagStats::BaseTagStats(BaseTags &_tags)
     percentOccsTaskId(this, "occ_task_id_percent",
                       "Percentage of cache occupancy per task id"),
     tagAccesses(this, "tag_accesses", "Number of tag accesses"),
-    dataAccesses(this, "data_accesses", "Number of data accesses")
+    dataAccesses(this, "data_accesses", "Number of data accesses"),
+    totalContribution(this, "total_contribution", "Total contribution"),
+    contributions(this, "contributions", "Contribution of each sector")
 {
 }
 
@@ -267,6 +275,11 @@ BaseTags::BaseTagStats::regStats()
     percentOccsTaskId.flags(nozero);
 
     percentOccsTaskId = occupanciesTaskId / Stats::constant(tags.numBlocks);
+
+    contributions
+        .init(tags.numPSectors)
+        .flags(nozero | nonan)
+        ;
 }
 
 void

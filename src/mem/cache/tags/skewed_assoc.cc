@@ -59,6 +59,8 @@ SkewedAssoc::SkewedAssoc(const Params *p)
     if (blkSize < 4 || !isPowerOf2(blkSize)) {
         fatal("Block size must be at least 4 and a power of 2");
     }
+
+    // Use indexing policy parameter
     indexingPolicy = p->indexing_policy;
 }
 
@@ -79,6 +81,9 @@ SkewedAssoc::tagsInit()
         // Associate a replacement data entry to the block
         blk->replacementData = replacementPolicy->instantiateEntry();
     }
+
+    // TODO: initialize the plc
+    indexingPolicy->setSector(0, 0);
 }
 
 void

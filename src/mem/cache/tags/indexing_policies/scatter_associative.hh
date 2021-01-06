@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "mem/cache/tags/indexing_policies/base.hh"
+#include "mem/cache/tags/indexing_policies/qarma64.hh"
 #include "params/ScatterAssociative.hh"
 
 class ReplaceableEntry;
@@ -46,7 +47,7 @@ class ReplaceableEntry;
  * A scatter associative indexing policy.
  * @sa  \ref gem5MemorySystem "gem5 Memory System"
  *
- * The scatter indexing policy has a variable mapping based on a hash function,
+ * The scatter indexing policy has a variable mapping based on a block cipher,
  * so a value x can be mapped to different sets, based on the way being used.
  *
  * For example, let's assume address A maps to set 3 on way 0. It will likely
@@ -71,6 +72,23 @@ class ScatterAssociative : public BaseIndexingPolicy
 {
   private:
     /**
+     * The instance of tweakable block cipher for scattering computation.
+     */
+    Qarma64* cipher;
+
+    /**
+     * Default key of the cipher instance.
+     * TODO: make it configurable.
+     */
+    const Addr W0 = 0x84be85ce9804e94b;
+    const Addr K0 = 0xec2802d4e0a488e9;
+
+    /**
+     * The number of encryption rounds.
+     */
+    const int NUM_ENC_ROUNDS = 5;
+
+    /**
      * The number of scattering functions implemented. Should be updated if
      * more functions are added. If more than this number of scattering
      * functions are needed (i.e., assoc > this value), we programatically
@@ -84,36 +102,13 @@ class ScatterAssociative : public BaseIndexingPolicy
     const int msbShift;
 
     /**
-     * The hash function itself. Uses the hash function H, as described in
-     * "Scatter-Associative Caches", from Seznec et al. (section 3.3): It
-     * applies an XOR to the MSB and LSB, shifts all bits one bit to the right,
-     * and set the result of the XOR as the new MSB.
-     *
-     * This function is not bijective if the address has only 1 bit, as the MSB
-     * and LSB will be the same, and therefore the xor will always be 0.
-     *
-     * @param addr The address to be hashed.
-     * @param The hashed address.
-     */
-    Addr hash(const Addr addr) const;
-
-    /**
-     * Inverse of the hash function.
-     * @sa hash().
-     *
-     * @param addr The address to be dehashed.
-     * @param The dehashed address.
-     */
-    Addr dehash(const Addr addr) const;
-
-    /**
-     * Address scattering function selection. It selects and applies one of the
-     * scattering functions based on the way provided.
+     * The scatter function intends to compute the set indices as a
+     * permutation of the address with a block cipher encryption algorithm.
      *
      * @param addr Address to be scattered. Should contain the set and tag
      * bits.
-     * @param way The cache way, used to select a hash function.
-     * @return The scattered address.
+     * @param way The cache way, used to consititute the cipher's tweak.
+     * @return The scattered set address.
      */
     Addr scatter(const Addr addr, const uint32_t way) const;
 
@@ -151,6 +146,14 @@ class ScatterAssociative : public BaseIndexingPolicy
      * Destructor.
      */
     ~ScatterAssociative() {};
+
+    /**
+     * Generate the tag from the given address.
+     *
+     * @param addr The address to get the tag from.
+     * @return The tag of the address.
+     */
+    Addr extractTag(const Addr addr) const override;
 
     /**
      * Find all possible entries for insertion and replacement of an address.

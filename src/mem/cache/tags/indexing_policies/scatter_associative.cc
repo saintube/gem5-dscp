@@ -47,6 +47,8 @@ ScatterAssociative::ScatterAssociative(const Params *p)
                   "functions. Expect sub-optimal scattering.\n");
     }
 
+    cipher = new Qarma64(W0, K0);
+
     // Check if set is too big to do scattering. If using big sets, rewrite
     // scattering functions accordingly to make good use of the hashing
     // function
@@ -61,138 +63,37 @@ ScatterAssociative::ScatterAssociative(const Params *p)
 }
 
 Addr
-ScatterAssociative::hash(const Addr addr) const
-{
-    // Get relevant bits
-    const uint8_t lsb = bits<Addr>(addr, 0);
-    const uint8_t msb = bits<Addr>(addr, msbShift);
-    const uint8_t xor_bit = msb ^ lsb;
-
-    // Shift-off LSB and set new MSB as xor of old LSB and MSB
-    return insertBits<Addr, uint8_t>(addr >> 1, msbShift, xor_bit);
-}
-
-Addr
-ScatterAssociative::dehash(const Addr addr) const
-{
-    // Get relevant bits. The original MSB is one bit away on the current MSB
-    // (which is the XOR bit). The original LSB can be retrieved from inverting
-    // the xor that generated the XOR bit.
-    const uint8_t msb = bits<Addr>(addr, msbShift - 1);
-    const uint8_t xor_bit = bits<Addr>(addr, msbShift);
-    const uint8_t lsb = msb ^ xor_bit;
-
-    // Remove current MSB (XOR bit), shift left and add LSB back
-    const Addr addr_no_msb = mbits<Addr>(addr, msbShift - 1, 0);
-    return insertBits<Addr, uint8_t>(addr_no_msb << 1, 0, lsb);
-}
-
-Addr
 ScatterAssociative::scatter(const Addr addr, const uint32_t way) const
 {
-    // TODO: hash with sector id from the PLC.
-    int secId = getSector(addr);
+    /**
+     * TODO: concatenate SDID (maybe also SecID) with way index as the tweak.
+     */
 
-    // Assume an address of size A bits can be decomposed into
-    // {addr3, addr2, addr1, addr0}, where:
-    //   addr0 (M bits) = Block offset;
-    //   addr1 (N bits) = Set bits in conventional cache;
-    //   addr3 (A - M - 2*N bits), addr2 (N bits) = Tag bits.
-    // We use addr1 and addr2, as proposed in the original paper
-    Addr addr1 = bits<Addr>(addr, msbShift, 0);
-    const Addr addr2 = bits<Addr>(addr, 2 * (msbShift + 1) - 1, msbShift + 1);
+    /**
+     * SCv1: simply use both tag and index bits as the plaintext, whose output
+     * has potential birthday-bound complexity.
+     */
+    // return cipher->qarma64_enc(addr, way, NUM_ENC_ROUNDS);
 
-    // Select and apply scattering function for given way
-    switch (way % NUM_SCATTERING_FUNCTIONS) {
-      case 0:
-        addr1 = hash(addr1) ^ hash(addr2) ^ addr2;
-        break;
-      case 1:
-        addr1 = hash(addr1) ^ hash(addr2) ^ addr1;
-        break;
-      case 2:
-        addr1 = hash(addr1) ^ dehash(addr2) ^ addr2;
-        break;
-      case 3:
-        addr1 = hash(addr1) ^ dehash(addr2) ^ addr1;
-        break;
-      case 4:
-        addr1 = dehash(addr1) ^ hash(addr2) ^ addr2;
-        break;
-      case 5:
-        addr1 = dehash(addr1) ^ hash(addr2) ^ addr1;
-        break;
-      case 6:
-        addr1 = dehash(addr1) ^ dehash(addr2) ^ addr2;
-        break;
-      case 7:
-        addr1 = dehash(addr1) ^ dehash(addr2) ^ addr1;
-        break;
-      default:
-        panic("A scattering function has not been implemented for this way.");
-    }
-
-    // If we have more than 8 ways, just pile them up on hashes. This is not
-    // the optimal solution, and can be improved by adding more scattering
-    // functions to the previous selector
-    for (uint32_t i = 0; i < way/NUM_SCATTERING_FUNCTIONS; i++) {
-        addr1 = hash(addr1);
-    }
-
-    return addr1;
+    /**
+     * SCv2: only use index bits as the plaintext, while the tag bits
+     * constitute the tweak in order to mitigate birthday-bound index
+     * collisions.
+     */
+    Addr indexBits = (addr & setMask);
+    Addr tweak = ((addr & (~setMask)) | way);
+    return cipher->qarma64_enc(indexBits, tweak, NUM_ENC_ROUNDS);
 }
 
 Addr
 ScatterAssociative::descatter(const Addr addr, const uint32_t way) const
 {
-    // Get relevant bits of the addr
-    Addr addr1 = bits<Addr>(addr, msbShift, 0);
-    const Addr addr2 = bits<Addr>(addr, 2 * (msbShift + 1) - 1, msbShift + 1);
-
-    // If we have more than NUM_SCATTERING_FUNCTIONS ways, unpile the hashes
-    if (way >= NUM_SCATTERING_FUNCTIONS) {
-        for (uint32_t i = 0; i < way/NUM_SCATTERING_FUNCTIONS; i++) {
-            addr1 = dehash(addr1);
-        }
-    }
-
-    // Select and apply scattering function for given way
-    switch (way % 8) {
-      case 0:
-        return dehash(addr1 ^ hash(addr2) ^ addr2);
-      case 1:
-        addr1 = addr1 ^ hash(addr2);
-        for (int i = 0; i < msbShift; i++) {
-            addr1 = hash(addr1);
-        }
-        return addr1;
-      case 2:
-        return dehash(addr1 ^ dehash(addr2) ^ addr2);
-      case 3:
-        addr1 = addr1 ^ dehash(addr2);
-        for (int i = 0; i < msbShift; i++) {
-            addr1 = hash(addr1);
-        }
-        return addr1;
-      case 4:
-        return hash(addr1 ^ hash(addr2) ^ addr2);
-      case 5:
-        addr1 = addr1 ^ hash(addr2);
-        for (int i = 0; i <= msbShift; i++) {
-            addr1 = hash(addr1);
-        }
-        return addr1;
-      case 6:
-        return hash(addr1 ^ dehash(addr2) ^ addr2);
-      case 7:
-        addr1 = addr1 ^ dehash(addr2);
-        for (int i = 0; i <= msbShift; i++) {
-            addr1 = hash(addr1);
-        }
-        return addr1;
-      default:
-        panic("A scattering function has not been implemented for this way.");
-    }
+    /**
+     * NOTE: this function is not effectual presently since the complete addr
+     * is recorded in the block.
+     * TODO: reduce tag bits cost by a decryption algorithm.
+     */
+    return cipher->qarma64_dec(addr, way, NUM_ENC_ROUNDS);
 }
 
 uint32_t
@@ -202,12 +103,24 @@ ScatterAssociative::extractSet(const Addr addr, const uint32_t way) const
 }
 
 Addr
+ScatterAssociative::extractTag(const Addr addr) const
+{
+    /**
+     * TODO: reduce tag bits cost.
+     */
+    return addr >> setShift;
+}
+
+Addr
 ScatterAssociative::regenerateAddr(const Addr tag,
                                   const ReplaceableEntry* entry) const
 {
+    /*
     const Addr addr_set = (tag << (msbShift + 1)) | entry->getSet();
     return (tag << tagShift) |
            ((descatter(addr_set, entry->getWay()) & setMask) << setShift);
+    */
+    return tag << setShift;
 }
 
 std::vector<ReplaceableEntry*>

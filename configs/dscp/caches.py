@@ -115,7 +115,7 @@ class L2Cache(SkewedCache):
     # Default parameters
     size = '256kB'
     assoc = 8
-    tag_latency = 20
+    tag_latency = 22    # tag lookup penalty for scattering
     data_latency = 20
     response_latency = 20
     mshrs = 20

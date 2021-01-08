@@ -51,7 +51,7 @@ from common import SimpleOpts
 class L1Cache(Cache):
     """Simple L1 Cache with default values"""
 
-    assoc = 2
+    assoc = 4
     tag_latency = 2
     data_latency = 2
     response_latency = 2
@@ -75,7 +75,7 @@ class L1ICache(L1Cache):
     """Simple L1 instruction cache with default values"""
 
     # Set the default size
-    size = '16kB'
+    size = '32kB'
 
     SimpleOpts.add_option('--l1i_size',
                           help="L1 instruction cache size. Default: %s" % size)
@@ -94,7 +94,7 @@ class L1DCache(L1Cache):
     """Simple L1 data cache with default values"""
 
     # Set the default size
-    size = '64kB'
+    size = '32kB'
 
     SimpleOpts.add_option('--l1d_size',
                           help="L1 data cache size. Default: %s" % size)
@@ -113,9 +113,9 @@ class L2Cache(SkewedCache):
     """Skewed-based L2 Cache with default values"""
 
     # Default parameters
-    size = '256kB'
+    size = '512kB'
     assoc = 8
-    tag_latency = 22    # tag lookup penalty for scattering
+    tag_latency = 21    # tag lookup penalty for scattering
     data_latency = 20
     response_latency = 20
     mshrs = 20

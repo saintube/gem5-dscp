@@ -106,7 +106,7 @@ X86_64Process::X86_64Process(ProcessParams *params,
 
     Addr brk_point = roundUp(image.maxAddr(), PageBytes);
     Addr stack_base = 0x7FFFFFFFF000ULL;
-    Addr max_stack_size = 8 * 1024 * 1024;
+    Addr max_stack_size = 64 * 1024 * 1024;
     Addr next_thread_stack_base = stack_base - max_stack_size;
     Addr mmap_end = 0x7FFFF7FFF000ULL;
 
@@ -133,7 +133,7 @@ I386Process::I386Process(ProcessParams *params,
 
     Addr brk_point = roundUp(image.maxAddr(), PageBytes);
     Addr stack_base = _gdtStart;
-    Addr max_stack_size = 8 * 1024 * 1024;
+    Addr max_stack_size = 64 * 1024 * 1024;
     Addr next_thread_stack_base = stack_base - max_stack_size;
     Addr mmap_end = 0xB7FFF000ULL;
 

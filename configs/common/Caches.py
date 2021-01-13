@@ -50,7 +50,7 @@ from m5.objects import *
 # specific instantiations.
 
 class L1Cache(Cache):
-    assoc = 2
+    assoc = 4   # change default l1 assoc from 2 to 4
     tag_latency = 2
     data_latency = 2
     response_latency = 2
@@ -68,6 +68,27 @@ class L1_DCache(L1Cache):
 class L2Cache(Cache):
     assoc = 8
     tag_latency = 20
+    data_latency = 20
+    response_latency = 20
+    mshrs = 20
+    tgts_per_mshr = 12
+    write_buffers = 8
+
+# L2ScatterCache is an m5 object representing ScatterCache in Level-2
+class L2ScatterCache(SkewedCache):
+    assoc = 8
+    tag_latency = 21    # add tag lookup penalty for scatter cache
+    data_latency = 20
+    response_latency = 20
+    mshrs = 20
+    tgts_per_mshr = 12
+    write_buffers = 8
+
+# L2DSCache is an m5 object representing DSCP in Level-2
+class L2DSCache(SkewedCache):
+    # TODO: implement DSCache
+    assoc = 8
+    tag_latency = 22    # add tag lookup penalty for DSCP
     data_latency = 20
     response_latency = 20
     mshrs = 20

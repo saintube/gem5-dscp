@@ -80,6 +80,11 @@ def config_cache(options, system):
         dcache_class, icache_class, l2_cache_class, walk_cache_class = \
             L1_DCache, L1_ICache, L2Cache, None
 
+        if options.l2_type == "scatter":
+            l2_cache_class = L2ScatterCache
+        elif options.l2_type == "dscp":
+            l2_cache_class = L2DSCache
+
         if buildEnv['TARGET_ISA'] in ['x86', 'riscv']:
             walk_cache_class = PageTableWalkerCache
 

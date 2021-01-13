@@ -121,20 +121,24 @@ def addNoISAOptions(parser):
                       help="use external ports of this port_type for caches")
     parser.add_option("--tlm-memory", type="string",
                       help="use external port for SystemC TLM cosimulation")
-    parser.add_option("--caches", action="store_true")
-    parser.add_option("--l2cache", action="store_true")
+    parser.add_option("--caches", action="store_true", default=True)
+    parser.add_option("--l2cache", action="store_true", default=True)
     parser.add_option("--num-dirs", type="int", default=1)
     parser.add_option("--num-l2caches", type="int", default=1)
     parser.add_option("--num-l3caches", type="int", default=1)
-    parser.add_option("--l1d_size", type="string", default="64kB")
+    parser.add_option("--l1d_size", type="string", default="32kB")
     parser.add_option("--l1i_size", type="string", default="32kB")
-    parser.add_option("--l2_size", type="string", default="2MB")
+    parser.add_option("--l2_size", type="string", default="512kB")
     parser.add_option("--l3_size", type="string", default="16MB")
-    parser.add_option("--l1d_assoc", type="int", default=2)
-    parser.add_option("--l1i_assoc", type="int", default=2)
+    parser.add_option("--l1d_assoc", type="int", default=4)
+    parser.add_option("--l1i_assoc", type="int", default=4)
     parser.add_option("--l2_assoc", type="int", default=8)
     parser.add_option("--l3_assoc", type="int", default=16)
     parser.add_option("--cacheline_size", type="int", default=64)
+    # add l2Cache class type options
+    parser.add_option("--l2_type", type="string", default="",
+                      help="""Class type of l2 caches (default, scatter, dscp)
+                       (if not set, use default class L2Cache).""")
 
     # Enable Ruby
     parser.add_option("--ruby", action="store_true")
@@ -168,7 +172,7 @@ def addCommonOptions(parser):
     parser.add_option("--list-cpu-types",
                       action="callback", callback=_listCpuTypes,
                       help="List available CPU types")
-    parser.add_option("--cpu-type", type="choice", default="AtomicSimpleCPU",
+    parser.add_option("--cpu-type", type="choice", default="TimingSimpleCPU",
                       choices=ObjectList.cpu_list.get_names(),
                       help = "type of cpu to run with")
     parser.add_option("--list-bp-types",

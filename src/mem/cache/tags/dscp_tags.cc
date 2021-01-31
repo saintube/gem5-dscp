@@ -41,16 +41,17 @@
 
 /**
  * @file
- * Definitions of a skewed tag store.
+ * Definitions of a dscp tag store.
  */
 
-#include "mem/cache/tags/skewed_assoc.hh"
+#include "mem/cache/tags/dscp_tags.hh"
 
 #include <string>
 
 #include "base/intmath.hh"
+#include "debug/CacheTags.hh"
 
-SkewedAssoc::SkewedAssoc(const Params *p)
+DSCPTags::DSCPTags(const Params *p)
     :BaseTags(p), allocAssoc(p->assoc), blks(p->size / p->block_size),
      sequentialAccess(p->sequential_access),
      replacementPolicy(p->replacement_policy)
@@ -62,10 +63,27 @@ SkewedAssoc::SkewedAssoc(const Params *p)
 
     // Use indexing policy parameter
     indexingPolicy = p->indexing_policy;
+    if (!indexingPolicy->isPLCEnabled) {
+        fatal("DSCP tags must be with PLC enabled");
+    }
+
+    // Only sets are counted as the pSector number
+    fatal_if(numBlocks % numPSectors != 0, "number of sets should "
+        "be the integer times of the number of pSectors");
+    fatal_if(numPSectors % allocAssoc != 0, "The number of partitioned "
+        "sectors should be an integral multiple of associtivity");
+    numPSectors /= allocAssoc;
+    unsigned sectSets = (numBlocks / numPSectors) / allocAssoc;
+    indexingPolicy->sectSets = sectSets;
+    DPRINTF(CacheTags, "DSCP: numBlocks %d, assoc %d, "
+        "numPSectors %d, sets per sector %d \n", numBlocks, allocAssoc,
+        numPSectors, sectSets);
+    fatal_if(numPSectors * allocAssoc * sectSets != numBlocks, "The "
+        "number of PSectors or secSects should be a integral number");
 }
 
 void
-SkewedAssoc::tagsInit()
+DSCPTags::tagsInit()
 {
     // Initialize all blocks
     for (unsigned blk_index = 0; blk_index < numBlocks; blk_index++) {
@@ -82,11 +100,13 @@ SkewedAssoc::tagsInit()
         blk->replacementData = replacementPolicy->instantiateEntry();
     }
 
-    // No need to initialize the plc for skewed-associative cache
+    // TODO: initialize the plc
+    indexingPolicy->plc->setSector(0, 0);
+    indexingPolicy->plc->initSectors(numPSectors);
 }
 
 void
-SkewedAssoc::invalidate(CacheBlk *blk)
+DSCPTags::invalidate(CacheBlk *blk)
 {
     BaseTags::invalidate(blk);
 
@@ -97,11 +117,11 @@ SkewedAssoc::invalidate(CacheBlk *blk)
     replacementPolicy->invalidate(blk->replacementData);
 }
 
-SkewedAssoc *
-SkewedAssocParams::create()
+DSCPTags *
+DSCPTagsParams::create()
 {
     // There must be a indexing policy
     fatal_if(!indexing_policy, "An indexing policy is required");
 
-    return new SkewedAssoc(this);
+    return new DSCPTags(this);
 }

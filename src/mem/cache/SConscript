@@ -52,5 +52,5 @@ DebugFlag('HWPrefetch')
 # array on each timing access, that you should probably have to ask for
 # it explicitly even above and beyond CacheAll.
 CompoundFlag('CacheAll', ['Cache', 'CacheComp', 'CachePort', 'CacheRepl',
-                          'CacheVerbose', 'HWPrefetch'])
+                          'CacheTags', 'CacheVerbose', 'HWPrefetch'])
 

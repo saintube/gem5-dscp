@@ -56,3 +56,8 @@ class ScatterAssociative(BaseIndexingPolicy):
     type = 'ScatterAssociative'
     cxx_class = 'ScatterAssociative'
     cxx_header = "mem/cache/tags/indexing_policies/scatter_associative.hh"
+
+class DSCP(BaseIndexingPolicy):
+    type = 'DSCP'
+    cxx_class = 'DSCP'
+    cxx_header = "mem/cache/tags/indexing_policies/dscp.hh"

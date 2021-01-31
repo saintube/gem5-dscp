@@ -50,6 +50,7 @@
 #include <map>
 #include <vector>
 
+#include "mem/cache/cache_blk.hh"
 #include "params/BaseIndexingPolicy.hh"
 #include "sim/sim_object.hh"
 
@@ -73,12 +74,22 @@ class PLC
      */
     unsigned tagShift;
 
-  public:
+    /**
+     * The sector shift in PLC.
+     */
+    unsigned sectShift;
+
+    /**
+     * The sector shift in PLC.
+     */
+    unsigned pSectors;
+
     /**
      * Maitaining the hashing between partition owners and sector id.
      */
     std::map<unsigned, int> m;
 
+  public:
     /**
      * Construct and initialize this policy.
      */
@@ -93,6 +104,40 @@ class PLC
      * getSize returns the capacity of PLC.
      */
     unsigned getCapacity();
+
+    /**
+     * initSectors initialize all the sector blks.
+     *
+     * @param pSects the number of pSectors.
+     */
+    void initSectors(unsigned pSects);
+
+    /**
+     * getSector returns the sector id of PLC. It returns -1 if no
+     * mapping for the given addr.
+     *
+     * @param addr The entry's address.
+     * @return the sector id.
+     */
+    int getSector(const Addr addr);
+
+    /**
+     * setSector sets the address field of given addr mapping to
+     * given sector id.
+     *
+     * @param addr The entry's address.
+     * @param the sector id.
+     * @return whether the mapping changed or not.
+     */
+    bool setSector(const Addr addr, int secId);
+
+    /**
+     * getVictimSector returns the victim sector according to PLC's
+     * replacement policy. It returns -1 if there is no eviction.
+     *
+     * @return the victim sector id.
+     */
+    int getVictimSector();
 };
 
 /**
@@ -138,11 +183,6 @@ class BaseIndexingPolicy : public SimObject
      * The number of partition lookup cache lines.
      */
     const int plc_size;
-
-    /**
-     * The partition lookup cache for partitioned indexing.
-     */
-    PLC* plc;
 
   public:
 
@@ -209,23 +249,28 @@ class BaseIndexingPolicy : public SimObject
                                                                     const = 0;
 
     /**
-     * getSector returns the sector id of PLC. It returns -1 if no
-     * mapping for the given addr.
-     *
-     * @param addr The entry's address.
-     * @return the sector id.
+     * The partition lookup cache for partitioned indexing. The PLC stores
+     * mappings from address field to cache sectors.
      */
-    int getSector(const Addr addr) const;
+    PLC* plc;
 
     /**
-     * setSector sets the address field of given addr mapping to
-     * given sector id.
-     *
-     * @param addr The entry's address.
-     * @param the sector id.
-     * @return whether the mapping changed or not.
+     * Determine whether the plc is enabled or not.
      */
-    bool setSector(const Addr addr, int secId);
+    bool isPLCEnabled;
+
+    /**
+     * The number of sets per sector.
+     */
+    unsigned sectSets;
+
+    /**
+     * Get the sets belonging to the sector.
+     *
+     * @param secId The sector ID.
+     * @return the sets' entries belonging to the sector.
+     */
+    virtual std::vector<CacheBlk*> getSectorSets(int secId) const;
 };
 
 #endif //__MEM_CACHE_INDEXING_POLICIES_BASE_HH__

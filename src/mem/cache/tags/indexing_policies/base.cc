@@ -56,7 +56,7 @@ BaseIndexingPolicy::BaseIndexingPolicy(const Params *p)
     : SimObject(p), assoc(p->assoc),
       numSets(p->size / (p->entry_size * assoc)),
       setShift(floorLog2(p->entry_size)), setMask(numSets - 1), sets(numSets),
-      tagShift(setShift + floorLog2(numSets)), plc_size(10)
+      tagShift(setShift + floorLog2(numSets)), plc_size(32)
       // TODO: set an approriate shift for the plc
 {
     fatal_if(!isPowerOf2(numSets), "# of sets must be non-zero and a power " \
@@ -104,6 +104,13 @@ BaseIndexingPolicy::extractTag(const Addr addr) const
     return (addr >> tagShift);
 }
 
+std::vector<CacheBlk*>
+BaseIndexingPolicy::getSectorSets(int secId) const
+{
+    std::vector<CacheBlk*> entries;
+    return entries;
+}
+
 PLC::PLC(unsigned size, unsigned shift)
 {
     capacity = size;
@@ -116,23 +123,36 @@ PLC::getCapacity()
     return capacity;
 }
 
+void
+PLC::initSectors(unsigned pSects)
+{
+    pSectors = pSects;
+}
+
 int
-BaseIndexingPolicy::getSector(const Addr addr) const
+PLC::getSector(const Addr addr)
 {
     unsigned addrField = (addr >> tagShift);
-    if (plc->m.count(addrField)) {
-        return plc->m[addrField];
+    if (m.count(addrField)) {
+        return m[addrField];
     }
     return -1;
 }
 
 bool
-BaseIndexingPolicy::setSector(const Addr addr, int secId)
+PLC::setSector(const Addr addr, int secId)
 {
-    unsigned addrField = addr >> tagShift;
-    if (plc->m[addrField] == secId) {
+    unsigned addrField = (addr >> tagShift);
+    if (m[addrField] == secId) {
         return false;
     }
-    plc->m[addrField] = secId;
+    m[addrField] = secId;
     return true;
+}
+
+int
+PLC::getVictimSector()
+{
+    // TODO:
+    return -1;
 }

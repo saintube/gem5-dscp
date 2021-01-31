@@ -97,6 +97,21 @@ class SkewedAssoc(BaseTags):
     indexing_policy = Param.BaseIndexingPolicy(
         ScatterAssociative(),"Indexing policy")
 
+class DSCPTags(BaseTags):
+    type = 'DSCPTags'
+    cxx_header = "mem/cache/tags/dscp_tags.hh"
+
+    # Get the cache associativity
+    assoc = Param.Int(Parent.assoc, "associativity")
+
+    # Get replacement policy from the parent (cache)
+    replacement_policy = Param.BaseReplacementPolicy(
+        Parent.replacement_policy, "Replacement policy")
+
+    # Get indexing policy
+    indexing_policy = Param.BaseIndexingPolicy(
+        DSCP(),"Indexing policy")
+
 class SectorTags(BaseTags):
     type = 'SectorTags'
     cxx_header = "mem/cache/tags/sector_tags.hh"

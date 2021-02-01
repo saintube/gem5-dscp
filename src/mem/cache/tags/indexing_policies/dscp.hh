@@ -141,6 +141,15 @@ class DSCP : public BaseIndexingPolicy
     std::vector<CacheBlk*> getSectorSets(int secId) const override;
 
     /**
+     * accessSector accesses the sector and update its replacement
+     * data. It always returns true when the PLC is enabled.
+     *
+     * @param secId the sector id.
+     * @return whether the access is successful or not.
+     */
+    bool accessSector(int secId) override;
+
+    /**
      * Find all possible entries for insertion and replacement of an address.
      * Should be called immediately before ReplacementPolicy's findVictim()
      * not to break cache resizing.

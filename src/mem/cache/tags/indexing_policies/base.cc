@@ -111,6 +111,13 @@ BaseIndexingPolicy::getSectorSets(int secId) const
     return entries;
 }
 
+bool
+BaseIndexingPolicy::accessSector(int secId)
+{
+    // the PLC is disabled by default
+    return false;
+}
+
 PLC::PLC(unsigned size, unsigned shift)
 {
     capacity = size;
@@ -127,16 +134,21 @@ void
 PLC::initSectors(unsigned pSects)
 {
     pSectors = pSects;
+    count = 0;
 }
 
 int
 PLC::getSector(const Addr addr)
 {
-    unsigned addrField = (addr >> tagShift);
-    if (m.count(addrField)) {
-        return m[addrField];
-    }
-    return -1;
+    /**
+     * FIXME: implement the real lookup
+     */
+    return ((addr >> tagShift) % pSectors);
+    // unsigned addrField = (addr >> tagShift);
+    // if (m.count(addrField)) {
+    //     return m[addrField];
+    // }
+    // return -1;
 }
 
 bool
@@ -153,6 +165,6 @@ PLC::setSector(const Addr addr, int secId)
 int
 PLC::getVictimSector()
 {
-    // TODO:
+    // the PLC is disabled by default
     return -1;
 }

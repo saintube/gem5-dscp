@@ -95,10 +95,13 @@ DSCP::descatter(const Addr addr, const uint32_t way) const
 uint32_t
 DSCP::extractSet(const Addr addr, const uint32_t way) const
 {
-    return scatter(addr >> setShift, way) & setMask;
+    // return scatter(addr >> setShift, way) & setMask;
     /**
      * TODO: Scatter the address into partitioned sector.
      */
+    // there should not have no plc miss
+    int secId = plc->getSector(addr);
+    return secId * sectSets + (scatter(addr >> setShift, way) % sectSets);
 }
 
 Addr
@@ -144,7 +147,6 @@ DSCP::getSectorSets(int secId) const
         return entries;
 
     // append all lines belonging to the sector sets
-    // TODO: should return CacheBlk but not ReplaceableEntry
     for (unsigned i = secId * sectSets; i < (secId + 1) * sectSets; i++) {
         for (unsigned j = 0; j < assoc; j++) {
             // NOTE: ensure the blks' type does not change
@@ -152,6 +154,17 @@ DSCP::getSectorSets(int secId) const
         }
     }
     return entries;
+}
+
+bool
+DSCP::accessSector(int secId)
+{
+    /**
+     * TODO: suppose the sector exists and so do the promotion.
+     */
+
+    // the PLC is enabled
+    return true;
 }
 
 DSCP *

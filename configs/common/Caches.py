@@ -95,8 +95,8 @@ class L2DSCache(SkewedCache):
     tgts_per_mshr = 12
     write_buffers = 8
     tags = Param.BaseTags(DSCPTags(), "Tag store")
-    # replacement_policy = Param.BaseReplacementPolicy(LRURP(),
-    #     "Replacement policy")
+    replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+        "Replacement policy")
 
 class IOCache(Cache):
     assoc = 8

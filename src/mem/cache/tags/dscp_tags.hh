@@ -176,7 +176,8 @@ class DSCPTags : public BaseTags
                          std::vector<CacheBlk*>& evict_blks) override
     {
         // Lookup PLC
-        if (indexingPolicy->plc->getSector(addr) < 0) {
+        int secId = indexingPolicy->plc->getSector(addr);
+        if (secId < 0) {
             // PLC misses, then evict lines in the Victim Sector
             int victimSecId = indexingPolicy->plc->getVictimSector();
             std::vector<CacheBlk*> plcVictims = indexingPolicy->getSectorSets(
@@ -184,8 +185,13 @@ class DSCPTags : public BaseTags
             evict_blks.insert(evict_blks.end(), plcVictims.begin(),
                 plcVictims.end());
         } else {
-            // TODO: PLC hits, update plc replacement info (touch)
+            /**
+             * TODO: update replacement info for a hit (touch)
+             */
         }
+        // Promotion
+        // bool res = indexingPolicy->accessSector(secId);
+        indexingPolicy->accessSector(secId);
 
         // Get possible entries to be victimized
         const std::vector<ReplaceableEntry*> entries =

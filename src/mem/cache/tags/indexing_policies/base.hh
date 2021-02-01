@@ -89,6 +89,11 @@ class PLC
      */
     std::map<unsigned, int> m;
 
+    /**
+     * The replacement counter.
+     */
+    int count;
+
   public:
     /**
      * Construct and initialize this policy.
@@ -115,6 +120,7 @@ class PLC
     /**
      * getSector returns the sector id of PLC. It returns -1 if no
      * mapping for the given addr.
+     * NOTE: the range of output is [-1, pSectors - 1].
      *
      * @param addr The entry's address.
      * @return the sector id.
@@ -126,7 +132,7 @@ class PLC
      * given sector id.
      *
      * @param addr The entry's address.
-     * @param the sector id.
+     * @param secId the sector id.
      * @return whether the mapping changed or not.
      */
     bool setSector(const Addr addr, int secId);
@@ -271,6 +277,15 @@ class BaseIndexingPolicy : public SimObject
      * @return the sets' entries belonging to the sector.
      */
     virtual std::vector<CacheBlk*> getSectorSets(int secId) const;
+
+    /**
+     * accessSector accesses the sector and update its replacement
+     * data. It always returns true when the PLC is enabled.
+     *
+     * @param secId the sector id.
+     * @return whether the access is successful or not.
+     */
+    virtual bool accessSector(int secId);
 };
 
 #endif //__MEM_CACHE_INDEXING_POLICIES_BASE_HH__

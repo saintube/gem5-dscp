@@ -49,7 +49,6 @@
 #include <string>
 
 #include "base/intmath.hh"
-#include "debug/CacheTags.hh"
 
 DSCPTags::DSCPTags(const Params *p)
     :BaseTags(p), allocAssoc(p->assoc), blks(p->size / p->block_size),
@@ -100,9 +99,10 @@ DSCPTags::tagsInit()
         blk->replacementData = replacementPolicy->instantiateEntry();
     }
 
-    // TODO: initialize the plc
-    indexingPolicy->plc->setSector(0, 0);
+    // initialize the plc
     indexingPolicy->plc->initSectors(numPSectors);
+    // FIXME: add graceful warmup
+    // indexingPolicy->plc->setPLCEntry(0, 0);
 }
 
 void

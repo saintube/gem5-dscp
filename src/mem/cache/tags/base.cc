@@ -62,7 +62,7 @@ BaseTags::BaseTags(const Params *p)
       warmupBound((p->warmup_percentage/100.0) * (p->size / p->block_size)),
       warmedUp(false), numBlocks(p->size / p->block_size),
       dataBlks(new uint8_t[p->size]), // Allocate data storage in one big chunk
-      numPSectors(numBlocks >> 8),
+      numPSectors(numBlocks >> 7),
       stats(*this)
 {
     registerExitCallback([this]() { cleanupRefs(); });
@@ -278,7 +278,7 @@ BaseTags::BaseTagStats::regStats()
 
     contributions
         .init(tags.numPSectors)
-        .flags(nozero | nonan)
+        .flags(nonan)
         ;
 }
 

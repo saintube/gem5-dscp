@@ -50,6 +50,7 @@
 #include <map>
 #include <vector>
 
+#include "base/statistics.hh"
 #include "mem/cache/cache_blk.hh"
 #include "params/BaseIndexingPolicy.hh"
 #include "sim/sim_object.hh"
@@ -75,9 +76,10 @@ class PLC
     unsigned tagShift;
 
     /**
-     * The sector shift in PLC.
+     * The tag mask in PLC.
+     * NOTE: the length of unmasked bits affects the hit rate.
      */
-    unsigned sectShift;
+    unsigned tagMask;
 
     /**
      * The sector shift in PLC.
@@ -94,11 +96,16 @@ class PLC
      */
     int count;
 
+    /**
+     * The second chance bits.
+     */
+    std::vector<bool> sc;
+
   public:
     /**
      * Construct and initialize this policy.
      */
-    PLC(unsigned size, unsigned shift);
+    PLC(unsigned psize, unsigned shift);
 
     /**
      * Destructor.
@@ -106,12 +113,13 @@ class PLC
     ~PLC() {};
 
     /**
-     * getSize returns the capacity of PLC.
+     * isFull returns whether PLC is full or not.
      */
-    unsigned getCapacity();
+    bool isFull();
 
     /**
-     * initSectors initialize all the sector blks.
+     * initSectors do the actual initialization like the configuration
+     * for sectors.
      *
      * @param pSects the number of pSectors.
      */
@@ -128,22 +136,46 @@ class PLC
     int getSector(const Addr addr);
 
     /**
-     * setSector sets the address field of given addr mapping to
+     * setPLCEntry sets the address field of given addr mapping to
      * given sector id.
      *
      * @param addr The entry's address.
      * @param secId the sector id.
      * @return whether the mapping changed or not.
      */
-    bool setSector(const Addr addr, int secId);
+    bool setPLCEntry(const Addr addr, int secId);
 
     /**
-     * getVictimSector returns the victim sector according to PLC's
-     * replacement policy. It returns -1 if there is no eviction.
+     * deletePLCEntry deletes the PLC entry for the given addr.
      *
-     * @return the victim sector id.
+     * @param addr The entry's address.
+     * @return whether the deletion is successful or not.
      */
-    int getVictimSector();
+    bool deletePLCEntry(const Addr addr);
+
+    /**
+     * deletePLCEntry deletes the PLC entry for the given sector.
+     *
+     * @param addr The entry's sector.
+     * @return whether the deletion is successful or not.
+     */
+    bool deletePLCEntry(int secId);
+
+    /**
+     * setSC sets the second chance bit for the given sector.
+     *
+     * @param secId The sector id.
+     * @param value the setting value.
+     */
+    void setSC(int secId, bool value);
+
+    /**
+     * getSC returns the second chance bit for the given sector.
+     *
+     * @param secId The sector id.
+     * @return the sc bit.
+     */
+    bool getSC(int secId);
 };
 
 /**
@@ -286,6 +318,14 @@ class BaseIndexingPolicy : public SimObject
      * @return whether the access is successful or not.
      */
     virtual bool accessSector(int secId);
+
+    /**
+     * getVictimSector returns the victim sector according to PLC's
+     * replacement policy. It returns -1 if there is no eviction.
+     *
+     * @return the victim sector id.
+     */
+    virtual int getVictimSector(Stats::Vector& contributions) const;
 };
 
 #endif //__MEM_CACHE_INDEXING_POLICIES_BASE_HH__

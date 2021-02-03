@@ -62,7 +62,8 @@ Addr
 DSCP::scatter(const Addr addr, const uint32_t way) const
 {
     /**
-     * TODO: concatenate SDID (maybe also SecID) with way index as the tweak.
+     * TODO: ScatterCache: concatenate SDID (maybe also SecID) with way index
+     * as the tweak.
      */
 
     /**
@@ -95,11 +96,10 @@ DSCP::descatter(const Addr addr, const uint32_t way) const
 uint32_t
 DSCP::extractSet(const Addr addr, const uint32_t way) const
 {
-    // return scatter(addr >> setShift, way) & setMask;
     /**
-     * TODO: Scatter the address into partitioned sector.
+     * Scatter the address into partitioned sector.
+     * NOTE: there should not have no plc miss
      */
-    // there should not have no plc miss
     int secId = plc->getSector(addr);
     return secId * sectSets + (scatter(addr >> setShift, way) % sectSets);
 }
@@ -130,6 +130,11 @@ DSCP::getPossibleEntries(const Addr addr) const
 {
     std::vector<ReplaceableEntry*> entries;
 
+    // PLC misses
+    int secId = plc->getSector(addr);
+    if (secId < 0)
+        return entries;
+
     // Parse all ways
     for (uint32_t way = 0; way < assoc; ++way) {
         // Apply hash to get set, and get way entry in it
@@ -149,8 +154,10 @@ DSCP::getSectorSets(int secId) const
     // append all lines belonging to the sector sets
     for (unsigned i = secId * sectSets; i < (secId + 1) * sectSets; i++) {
         for (unsigned j = 0; j < assoc; j++) {
-            // NOTE: ensure the blks' type does not change
-            entries.push_back(static_cast<CacheBlk*>(sets[i][j]));
+            // NOTE: ensure the blk type does not change
+            CacheBlk* blk = static_cast<CacheBlk*>(sets[i][j]);
+            if (blk->isValid())
+                entries.push_back(blk);
         }
     }
     return entries;
@@ -162,9 +169,29 @@ DSCP::accessSector(int secId)
     /**
      * TODO: suppose the sector exists and so do the promotion.
      */
-
     // the PLC is enabled
     return true;
+}
+
+int
+DSCP::getVictimSector(Stats::Vector& contributions) const
+{
+    // The replacement is expensive since it takes O(n) get the victim
+    // sector and erase entries.
+    double minContr = 2147483647;
+    int victim = -1;
+    for (int i = 0; i < contributions.size(); i++) {
+        if (!plc->getSC(i)) {
+            // TODO: find a mostly-unused sector
+            return i;
+        }
+        double contr = contributions[i].value();
+        if (contr < minContr) {
+            minContr = contr;
+            victim = i;
+        }
+    }
+    return victim;
 }
 
 DSCP *

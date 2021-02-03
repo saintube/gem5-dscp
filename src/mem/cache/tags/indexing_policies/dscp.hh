@@ -150,6 +150,14 @@ class DSCP : public BaseIndexingPolicy
     bool accessSector(int secId) override;
 
     /**
+     * getVictimSector returns the victim sector according to PLC's
+     * replacement policy. It returns -1 if there is no eviction.
+     *
+     * @return the victim sector id.
+     */
+    int getVictimSector(Stats::Vector& contributions) const override;
+
+    /**
      * Find all possible entries for insertion and replacement of an address.
      * Should be called immediately before ReplacementPolicy's findVictim()
      * not to break cache resizing.

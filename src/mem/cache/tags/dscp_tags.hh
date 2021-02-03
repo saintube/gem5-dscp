@@ -55,6 +55,7 @@
 
 #include "base/logging.hh"
 #include "base/types.hh"
+#include "debug/CacheTags.hh"
 #include "mem/cache/base.hh"
 #include "mem/cache/cache_blk.hh"
 #include "mem/cache/replacement_policies/base.hh"
@@ -85,6 +86,9 @@ class DSCPTags : public BaseTags
 
     /** Replacement policy */
     BaseReplacementPolicy *replacementPolicy;
+
+    /** The maximal of contribution */
+    const double MAX_CONTRIBUTION = 16384;
 
   public:
     /** Convenience typedef. */
@@ -151,6 +155,14 @@ class DSCPTags : public BaseTags
             // Contribution always increases once an hit.
             stats.totalContribution += 1;
             stats.contributions[blk->getSet() / indexingPolicy->sectSets] += 1;
+            if (stats.totalContribution.value() >= MAX_CONTRIBUTION) {
+                DPRINTF(CacheTags, "DSCP: reset contributions at total %d\n",
+                    stats.totalContribution.value());
+                for (int i = 0; i < numPSectors; i++) {
+                    stats.contributions[i] = 0;
+                }
+                stats.totalContribution = 0;
+            }
         } else {
             // TODO: For a miss, reset the contribution if needed.
         }
@@ -176,18 +188,30 @@ class DSCPTags : public BaseTags
                          std::vector<CacheBlk*>& evict_blks) override
     {
         // Lookup PLC
+        // DPRINTF(CacheTags, "DSCP: lookup PLC for addr %d\n", addr);
         int secId = indexingPolicy->plc->getSector(addr);
         if (secId < 0) {
             // PLC misses, then evict lines in the Victim Sector
-            int victimSecId = indexingPolicy->plc->getVictimSector();
-            std::vector<CacheBlk*> plcVictims = indexingPolicy->getSectorSets(
-                victimSecId);
-            evict_blks.insert(evict_blks.end(), plcVictims.begin(),
-                plcVictims.end());
+            int victimSecId = indexingPolicy->getVictimSector(
+                stats.contributions);
+            // DPRINTF(CacheTags, "DSCP: get victim sector %d\n", victimSecId);
+            if (indexingPolicy->plc->isFull()) {
+                // require PLC replacement
+                std::vector<CacheBlk*> plcVictims =
+                    indexingPolicy->getSectorSets(victimSecId);
+                evict_blks.insert(evict_blks.end(), plcVictims.begin(),
+                    plcVictims.end());
+                DPRINTF(CacheTags, "DSCP: replace victim sector %d, evict %d "
+                    "sets\n", victimSecId, plcVictims.size());
+                indexingPolicy->plc->deletePLCEntry(victimSecId);
+            }
+            secId = victimSecId;
+            indexingPolicy->plc->setPLCEntry(addr, secId);
         } else {
             /**
              * TODO: update replacement info for a hit (touch)
              */
+            // DPRINTF(CacheTags, "DSCP: PLC hit for addr %d\n", addr);
         }
         // Promotion
         // bool res = indexingPolicy->accessSector(secId);

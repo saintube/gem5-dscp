@@ -118,16 +118,25 @@ BaseIndexingPolicy::accessSector(int secId)
     return false;
 }
 
-PLC::PLC(unsigned size, unsigned shift)
+int
+BaseIndexingPolicy::getVictimSector(Stats::Vector& contributions) const
 {
-    capacity = size;
+    // the PLC is disabled by default
+    return -1;
+}
+
+PLC::PLC(unsigned psize, unsigned shift)
+{
+    // possibly get reset by initSector()
+    capacity = psize;
     tagShift = shift;
+    tagMask = (1 << (floorLog2(psize) + 1)) - 1;
 };
 
-unsigned
-PLC::getCapacity()
+bool
+PLC::isFull()
 {
-    return capacity;
+    return m.size() >= capacity;
 }
 
 void
@@ -135,6 +144,13 @@ PLC::initSectors(unsigned pSects)
 {
     pSectors = pSects;
     count = 0;
+    capacity = pSectors << 4;
+    tagMask = (1 << (floorLog2(capacity) + 0)) - 1;
+    // reset all entries
+    m.erase(m.begin(), m.end());
+    // only resize sc bits when the PLC is enabled
+    sc.resize(pSects);
+    sc.erase(sc.begin(), sc.end());
 }
 
 int
@@ -143,28 +159,58 @@ PLC::getSector(const Addr addr)
     /**
      * FIXME: implement the real lookup
      */
-    return ((addr >> tagShift) % pSectors);
-    // unsigned addrField = (addr >> tagShift);
-    // if (m.count(addrField)) {
-    //     return m[addrField];
-    // }
-    // return -1;
+    // return ((addr >> tagShift) % pSectors);
+    unsigned addrField = ((addr >> tagShift) & tagMask);
+    if (m.count(addrField)) {
+        return m[addrField];
+    }
+    return -1;
 }
 
 bool
-PLC::setSector(const Addr addr, int secId)
+PLC::setPLCEntry(const Addr addr, int secId)
 {
-    unsigned addrField = (addr >> tagShift);
-    if (m[addrField] == secId) {
+    unsigned addrField = ((addr >> tagShift) & tagMask);
+    if (secId < 0) {
         return false;
     }
     m[addrField] = secId;
+    sc[secId] = true;
     return true;
 }
 
-int
-PLC::getVictimSector()
+bool
+PLC::deletePLCEntry(const Addr addr)
 {
-    // the PLC is disabled by default
-    return -1;
+    unsigned addrField = ((addr >> tagShift) & tagMask);
+    m.erase(addrField);
+    return true;
+}
+
+bool
+PLC::deletePLCEntry(int secId)
+{
+    if (secId < 0)
+        return false;
+    bool changed = false;
+    for (auto iter : m) {
+        if (iter.second == secId) {
+            m.erase(iter.first);
+            changed = true;
+        }
+    }
+    sc[secId] = false;
+    return changed;
+}
+
+void
+PLC::setSC(int secId, bool value)
+{
+    sc[secId] = value;
+}
+
+bool
+PLC::getSC(int secId)
+{
+    return sc[secId];
 }

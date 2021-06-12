@@ -134,14 +134,14 @@ FALRU::invalidate(CacheBlk *blk)
 }
 
 CacheBlk*
-FALRU::accessBlock(Addr addr, bool is_secure, Cycles &lat)
+FALRU::accessBlock(Addr addr, bool is_secure, Cycles &lat, const PacketPtr pkt)
 {
-    return accessBlock(addr, is_secure, lat, 0);
+    return accessBlock(0, addr, is_secure, lat);
 }
 
 CacheBlk*
-FALRU::accessBlock(Addr addr, bool is_secure, Cycles &lat,
-                   CachesMask *in_caches_mask)
+FALRU::accessBlock(CachesMask *in_caches_mask, Addr addr, bool is_secure,
+                   Cycles &lat)
 {
     CachesMask mask = 0;
     FALRUBlk* blk = static_cast<FALRUBlk*>(findBlock(addr, is_secure));
@@ -193,7 +193,8 @@ FALRU::findBlockBySetAndWay(int set, int way) const
 
 CacheBlk*
 FALRU::findVictim(Addr addr, const bool is_secure, const std::size_t size,
-                  std::vector<CacheBlk*>& evict_blks)
+                  std::vector<CacheBlk*>& evict_blks, const PacketPtr pkt,
+                  Stats::VResult miss_rate)
 {
     // The victim is always stored on the tail for the FALRU
     FALRUBlk* victim = tail;

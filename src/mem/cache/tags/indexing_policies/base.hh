@@ -52,6 +52,7 @@
 
 #include "base/statistics.hh"
 #include "mem/cache/cache_blk.hh"
+#include "mem/packet.hh"
 #include "params/BaseIndexingPolicy.hh"
 #include "sim/sim_object.hh"
 
@@ -64,22 +65,20 @@ class PLC;
  */
 class PLC
 {
-  private:
+  public:
+    const unsigned MAX_COUNT = 1073741824;
+
     /**
      * The capacity for PLC lines.
      */
     unsigned capacity;
 
     /**
-     * The tag shift in PLC.
+     * The set shift in PLC.
      */
-    unsigned tagShift;
+    unsigned setShift;
 
-    /**
-     * The tag mask in PLC.
-     * NOTE: the length of unmasked bits affects the hit rate.
-     */
-    unsigned tagMask;
+    unsigned setMask;
 
     /**
      * The sector shift in PLC.
@@ -91,21 +90,17 @@ class PLC
      */
     std::map<unsigned, int> m;
 
+    std::map<unsigned, unsigned> ts;
+
     /**
      * The replacement counter.
      */
-    int count;
+    unsigned count;
 
-    /**
-     * The second chance bits.
-     */
-    std::vector<bool> sc;
-
-  public:
     /**
      * Construct and initialize this policy.
      */
-    PLC(unsigned psize, unsigned shift);
+    PLC(unsigned psize, unsigned shift, unsigned mask);
 
     /**
      * Destructor.
@@ -151,7 +146,7 @@ class PLC
      * @param addr The entry's address.
      * @return whether the deletion is successful or not.
      */
-    bool deletePLCEntry(const Addr addr);
+    bool deletePLCEntry(unsigned addr);
 
     /**
      * deletePLCEntry deletes the PLC entry for the given sector.
@@ -159,23 +154,27 @@ class PLC
      * @param addr The entry's sector.
      * @return whether the deletion is successful or not.
      */
-    bool deletePLCEntry(int secId);
+    // bool deletePLCEntry(int secId);
+
+    unsigned getVictimEntry(int secId);
+
+    // use cacheline addr
+    inline unsigned getAddrField(const Addr addr) {
+        unsigned addrField = ((addr >> setShift) & setMask);
+        return addrField;
+    }
 
     /**
-     * setSC sets the second chance bit for the given sector.
+     * accessSector accesses the sector and update its replacement
+     * data. It always returns true when the PLC is enabled.
      *
-     * @param secId The sector id.
-     * @param value the setting value.
+     * @param addr the addr.
+     * @return whether the access is successful or not.
      */
-    void setSC(int secId, bool value);
+    bool accessSector(const Addr addr);
+    bool accessSector(const Addr addr, bool isLow);
 
-    /**
-     * getSC returns the second chance bit for the given sector.
-     *
-     * @param secId The sector id.
-     * @return the sc bit.
-     */
-    bool getSC(int secId);
+    unsigned callCounter();
 };
 
 /**
@@ -306,18 +305,13 @@ class BaseIndexingPolicy : public SimObject
      * Get the sets belonging to the sector.
      *
      * @param secId The sector ID.
-     * @return the sets' entries belonging to the sector.
+     * @param evict_blks blks in the sector to be evicted.
      */
-    virtual std::vector<CacheBlk*> getSectorSets(int secId) const;
-
-    /**
-     * accessSector accesses the sector and update its replacement
-     * data. It always returns true when the PLC is enabled.
-     *
-     * @param secId the sector id.
-     * @return whether the access is successful or not.
-     */
-    virtual bool accessSector(int secId);
+    virtual void getSectorSets(int secId, unsigned addrField,
+                               std::vector<CacheBlk*>& evict_blks) const
+    {
+        return;
+    }
 
     /**
      * getVictimSector returns the victim sector according to PLC's
@@ -325,7 +319,12 @@ class BaseIndexingPolicy : public SimObject
      *
      * @return the victim sector id.
      */
-    virtual int getVictimSector(Stats::Vector& contributions) const;
+    virtual int getVictimSector(const PacketPtr pkt, Stats::Vector& contrs,
+                                Stats::Scalar& totalContr,
+                                Stats::VResult miss_rate) const
+    {
+        return -1;
+    }
 };
 
 #endif //__MEM_CACHE_INDEXING_POLICIES_BASE_HH__

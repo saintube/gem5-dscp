@@ -51,6 +51,7 @@
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "mem/cache/replacement_policies/replaceable_entry.hh"
+#include "sim/core.hh"
 
 BaseIndexingPolicy::BaseIndexingPolicy(const Params *p)
     : SimObject(p), assoc(p->assoc),
@@ -70,8 +71,10 @@ BaseIndexingPolicy::BaseIndexingPolicy(const Params *p)
 
     // TODO: initialize the plc
     fatal_if(plc_size < 0, "plc size must be no less than zero");
-    fatal_if(tagShift < 0, "tagShift must be no less than zero");
-    plc = new PLC((unsigned)plc_size, (unsigned)tagShift);
+    fatal_if(setShift < 0, "setShift must be no less than zero");
+
+    plc = new PLC((unsigned)plc_size, (unsigned)setShift, (unsigned)setMask);
+    warn_if(setMask > 0xff, "setMask is %u", setMask);
 }
 
 ReplaceableEntry*
@@ -104,33 +107,13 @@ BaseIndexingPolicy::extractTag(const Addr addr) const
     return (addr >> tagShift);
 }
 
-std::vector<CacheBlk*>
-BaseIndexingPolicy::getSectorSets(int secId) const
-{
-    std::vector<CacheBlk*> entries;
-    return entries;
-}
-
-bool
-BaseIndexingPolicy::accessSector(int secId)
-{
-    // the PLC is disabled by default
-    return false;
-}
-
-int
-BaseIndexingPolicy::getVictimSector(Stats::Vector& contributions) const
-{
-    // the PLC is disabled by default
-    return -1;
-}
-
-PLC::PLC(unsigned psize, unsigned shift)
+PLC::PLC(unsigned psize, unsigned shift, unsigned mask)
 {
     // possibly get reset by initSector()
     capacity = psize;
-    tagShift = shift;
-    tagMask = (1 << (floorLog2(psize) + 1)) - 1;
+    setShift = shift;
+    //setMask = mask;
+    setMask = (mask & 0xfff);    // reduce addrField bits
 };
 
 bool
@@ -143,24 +126,21 @@ void
 PLC::initSectors(unsigned pSects)
 {
     pSectors = pSects;
+    // set capacity with a specific eviction prob
+    //capacity = (setMask + 1) * 255 / 256;
+    //capacity = 0x1000 - 2;
+    capacity = 0x1000 - 1;
     count = 0;
-    capacity = pSectors << 4;
-    tagMask = (1 << (floorLog2(capacity) + 0)) - 1;
     // reset all entries
-    m.erase(m.begin(), m.end());
-    // only resize sc bits when the PLC is enabled
-    sc.resize(pSects);
-    sc.erase(sc.begin(), sc.end());
+    m.clear();
+    // clear all timestamps
+    ts.clear();
 }
 
 int
 PLC::getSector(const Addr addr)
 {
-    /**
-     * FIXME: implement the real lookup
-     */
-    // return ((addr >> tagShift) % pSectors);
-    unsigned addrField = ((addr >> tagShift) & tagMask);
+    unsigned addrField = getAddrField(addr);
     if (m.count(addrField)) {
         return m[addrField];
     }
@@ -170,23 +150,26 @@ PLC::getSector(const Addr addr)
 bool
 PLC::setPLCEntry(const Addr addr, int secId)
 {
-    unsigned addrField = ((addr >> tagShift) & tagMask);
     if (secId < 0) {
         return false;
     }
+    unsigned addrField = getAddrField(addr);
     m[addrField] = secId;
-    sc[secId] = true;
     return true;
 }
 
 bool
-PLC::deletePLCEntry(const Addr addr)
+PLC::deletePLCEntry(unsigned addrField)
 {
-    unsigned addrField = ((addr >> tagShift) & tagMask);
+    //unsigned addrField = getAddrField(addr);
+    //int secId = m[addrField];
     m.erase(addrField);
+    // delete ts
+    ts.erase(addrField);
     return true;
 }
 
+/*
 bool
 PLC::deletePLCEntry(int secId)
 {
@@ -199,18 +182,54 @@ PLC::deletePLCEntry(int secId)
             changed = true;
         }
     }
-    sc[secId] = false;
+    setSC(secId, 0);
     return changed;
 }
+*/
 
-void
-PLC::setSC(int secId, bool value)
+unsigned
+PLC::getVictimEntry(int secId)
 {
-    sc[secId] = value;
+    // lru
+    unsigned addrField = -1;
+    unsigned lr = MAX_COUNT;
+    for (auto iter : m) {
+        if (ts[iter.first] <= lr) {
+            lr = ts[iter.first];
+            addrField = iter.first;
+        }
+    }
+    return addrField;
 }
 
 bool
-PLC::getSC(int secId)
+PLC::accessSector(const Addr addr)
 {
-    return sc[secId];
+    //ts[addrField] = curTick();
+    unsigned addrField = getAddrField(addr);
+    ts[addrField] = callCounter();
+    return true;
+}
+
+bool
+PLC::accessSector(const Addr addr, bool isLow)
+{
+    //ts[addrField] = curTick();
+    unsigned count = callCounter();
+    if (isLow && count >= 1024)
+        count -= 1024;
+    unsigned addrField = getAddrField(addr);
+    if (ts[addrField] < count || ts[addrField] >= count + 2048)
+        ts[addrField] = count;
+    return true;
+}
+
+unsigned
+PLC::callCounter()
+{
+    count++;
+    if (count >= MAX_COUNT) {
+        count = 0;
+    }
+    return count;
 }

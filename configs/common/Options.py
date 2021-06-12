@@ -105,8 +105,11 @@ def addNoISAOptions(parser):
                       help = "number of memory channels")
     parser.add_option("--mem-ranks", type="int", default=None,
                       help = "number of memory ranks per channel")
+    #parser.add_option("--mem-size", action="store", type="string",
+    #                  default="512MB",
+    #                  help="Specify the physical memory size (single memory)")
     parser.add_option("--mem-size", action="store", type="string",
-                      default="512MB",
+                      default="2048MB",
                       help="Specify the physical memory size (single memory)")
     parser.add_option("--enable-dram-powerdown", action="store_true",
                        help="Enable low-power states in DRAMInterface")
@@ -129,6 +132,9 @@ def addNoISAOptions(parser):
     parser.add_option("--l1d_size", type="string", default="32kB")
     parser.add_option("--l1i_size", type="string", default="32kB")
     parser.add_option("--l2_size", type="string", default="512kB")
+    #parser.add_option("--l2_size", type="string", default="1024kB")
+    #parser.add_option("--l2_size", type="string", default="2048kB")
+    #parser.add_option("--l2_size", type="string", default="4096kB")
     parser.add_option("--l3_size", type="string", default="16MB")
     parser.add_option("--l1d_assoc", type="int", default=4)
     parser.add_option("--l1i_assoc", type="int", default=4)
@@ -137,8 +143,8 @@ def addNoISAOptions(parser):
     parser.add_option("--cacheline_size", type="int", default=64)
     # add l2Cache class type options
     parser.add_option("--l2_type", type="string", default="",
-                      help="""Class type of l2 caches (default, scatter, dscp)
-                       (if not set, use default class L2Cache).""")
+                      help="""Class type of l2 caches (default, rr, scatter,
+                      dscp) (if not set, use default class L2Cache).""")
 
     # Enable Ruby
     parser.add_option("--ruby", action="store_true")

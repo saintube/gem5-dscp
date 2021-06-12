@@ -74,6 +74,18 @@ class L2Cache(Cache):
     tgts_per_mshr = 12
     write_buffers = 8
 
+class L2RRCache(Cache):
+    assoc = 8
+    tag_latency = 20
+    data_latency = 20
+    response_latency = 20
+    mshrs = 20
+    tgts_per_mshr = 12
+    write_buffers = 8
+    #
+    replacement_policy = Param.BaseReplacementPolicy(RandomRP(),
+        "Replacement policy")
+
 # L2ScatterCache is an m5 object representing ScatterCache in Level-2
 class L2ScatterCache(SkewedCache):
     assoc = 8
@@ -83,6 +95,9 @@ class L2ScatterCache(SkewedCache):
     mshrs = 20
     tgts_per_mshr = 12
     write_buffers = 8
+    #
+    replacement_policy = Param.BaseReplacementPolicy(RandomRP(),
+        "Replacement policy")
 
 # L2DSCache is an m5 object representing DSCP in Level-2
 class L2DSCache(SkewedCache):
@@ -93,9 +108,9 @@ class L2DSCache(SkewedCache):
     response_latency = 20
     mshrs = 20
     tgts_per_mshr = 12
-    write_buffers = 8
+    write_buffers = 512
     tags = Param.BaseTags(DSCPTags(), "Tag store")
-    replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+    replacement_policy = Param.BaseReplacementPolicy(RandomRP(),
         "Replacement policy")
 
 class IOCache(Cache):

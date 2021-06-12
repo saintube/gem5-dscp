@@ -132,22 +132,8 @@ class DSCP : public BaseIndexingPolicy
      */
     Addr extractTag(const Addr addr) const override;
 
-    /**
-     * Get the sets belonging to the sector.
-     *
-     * @param secId The sector ID.
-     * @return the sets' blks belonging to the sector.
-     */
-    std::vector<CacheBlk*> getSectorSets(int secId) const override;
-
-    /**
-     * accessSector accesses the sector and update its replacement
-     * data. It always returns true when the PLC is enabled.
-     *
-     * @param secId the sector id.
-     * @return whether the access is successful or not.
-     */
-    bool accessSector(int secId) override;
+    void getSectorSets(int secId, unsigned addr,
+                       std::vector<CacheBlk*>& evict_blks) const override;
 
     /**
      * getVictimSector returns the victim sector according to PLC's
@@ -155,7 +141,9 @@ class DSCP : public BaseIndexingPolicy
      *
      * @return the victim sector id.
      */
-    int getVictimSector(Stats::Vector& contributions) const override;
+    int getVictimSector(const PacketPtr pkt, Stats::Vector& contrs,
+                        Stats::Scalar& totalContr,
+                        Stats::VResult miss_rate) const override;
 
     /**
      * Find all possible entries for insertion and replacement of an address.

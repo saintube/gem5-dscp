@@ -132,7 +132,8 @@ SectorTags::invalidate(CacheBlk *blk)
 }
 
 CacheBlk*
-SectorTags::accessBlock(Addr addr, bool is_secure, Cycles &lat)
+SectorTags::accessBlock(Addr addr, bool is_secure, Cycles &lat,
+                        const PacketPtr pkt)
 {
     CacheBlk *blk = findBlock(addr, is_secure);
 
@@ -221,7 +222,8 @@ SectorTags::findBlock(Addr addr, bool is_secure) const
 
 CacheBlk*
 SectorTags::findVictim(Addr addr, const bool is_secure, const std::size_t size,
-                       std::vector<CacheBlk*>& evict_blks)
+                       std::vector<CacheBlk*>& evict_blks,
+                       const PacketPtr pkt, Stats::VResult miss_rate)
 {
     // Get possible entries to be victimized
     const std::vector<ReplaceableEntry*> sector_entries =

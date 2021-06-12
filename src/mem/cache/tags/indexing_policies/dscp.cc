@@ -37,6 +37,7 @@
 #include "base/bitfield.hh"
 #include "base/intmath.hh"
 #include "base/logging.hh"
+#include "base/random.hh"
 #include "mem/cache/replacement_policies/replaceable_entry.hh"
 
 DSCP::DSCP(const Params *p)
@@ -47,8 +48,8 @@ DSCP::DSCP(const Params *p)
     // Check if set is too big to do scattering. If using big sets, rewrite
     // scattering functions accordingly to make good use of the hashing
     // function
-    panic_if(setShift + 2 * (msbShift + 1) > 64, "Unsuported number of bits " \
-             "for the scattering functions.");
+    panic_if(setShift + 2 * (msbShift + 1) > 64, "Unsuported number of bits "
+        "for the scattering functions.");
 
     // We must have more than two sets, otherwise the MSB and LSB are the same
     // bit, and the xor of them will always be 0
@@ -58,8 +59,7 @@ DSCP::DSCP(const Params *p)
     isPLCEnabled = true;
 }
 
-Addr
-DSCP::scatter(const Addr addr, const uint32_t way) const
+Addr DSCP::scatter(const Addr addr, const uint32_t way) const
 {
     /**
      * TODO: ScatterCache: concatenate SDID (maybe also SecID) with way index
@@ -82,8 +82,7 @@ DSCP::scatter(const Addr addr, const uint32_t way) const
     return cipher->qarma64_enc(indexBits, tweak, NUM_ENC_ROUNDS);
 }
 
-Addr
-DSCP::descatter(const Addr addr, const uint32_t way) const
+Addr DSCP::descatter(const Addr addr, const uint32_t way) const
 {
     /**
      * NOTE: this function is not effectual presently since the complete addr
@@ -101,11 +100,10 @@ DSCP::extractSet(const Addr addr, const uint32_t way) const
      * NOTE: there should not have no plc miss
      */
     int secId = plc->getSector(addr);
-    return secId * sectSets + (scatter(addr >> setShift, way) % sectSets);
+    return secId * sectSets + (scatter((addr >> setShift), way) % sectSets);
 }
 
-Addr
-DSCP::extractTag(const Addr addr) const
+Addr DSCP::extractTag(const Addr addr) const
 {
     /**
      * TODO: reduce tag bits cost.
@@ -113,9 +111,8 @@ DSCP::extractTag(const Addr addr) const
     return addr >> setShift;
 }
 
-Addr
-DSCP::regenerateAddr(const Addr tag,
-                                  const ReplaceableEntry* entry) const
+Addr DSCP::regenerateAddr(const Addr tag,
+                          const ReplaceableEntry *entry) const
 {
     /*
     const Addr addr_set = (tag << (msbShift + 1)) | entry->getSet();
@@ -125,10 +122,10 @@ DSCP::regenerateAddr(const Addr tag,
     return tag << setShift;
 }
 
-std::vector<ReplaceableEntry*>
+std::vector<ReplaceableEntry *>
 DSCP::getPossibleEntries(const Addr addr) const
 {
-    std::vector<ReplaceableEntry*> entries;
+    std::vector<ReplaceableEntry *> entries;
 
     // PLC misses
     int secId = plc->getSector(addr);
@@ -136,7 +133,8 @@ DSCP::getPossibleEntries(const Addr addr) const
         return entries;
 
     // Parse all ways
-    for (uint32_t way = 0; way < assoc; ++way) {
+    for (uint32_t way = 0; way < assoc; ++way)
+    {
         // Apply hash to get set, and get way entry in it
         entries.push_back(sets[extractSet(addr, way)][way]);
     }
@@ -144,54 +142,49 @@ DSCP::getPossibleEntries(const Addr addr) const
     return entries;
 }
 
-std::vector<CacheBlk*>
-DSCP::getSectorSets(int secId) const
+void DSCP::getSectorSets(int secId, unsigned addrField,
+                         std::vector<CacheBlk *> &evict_blks) const
 {
-    std::vector<CacheBlk*> entries;
-    if (secId < 0)
-        return entries;
-
-    // append all lines belonging to the sector sets
-    for (unsigned i = secId * sectSets; i < (secId + 1) * sectSets; i++) {
-        for (unsigned j = 0; j < assoc; j++) {
+    // here the addr is not the memory address but a plc addrField
+    //for (unsigned i = secId * sectSets; i < (secId + 1) * sectSets; i++) {
+    for (unsigned i = 0; i < sets.size(); i++)
+    {
+        for (unsigned j = 0; j < assoc; j++)
+        {
             // NOTE: ensure the blk type does not change
-            CacheBlk* blk = static_cast<CacheBlk*>(sets[i][j]);
-            if (blk->isValid())
-                entries.push_back(blk);
+            CacheBlk *blk = static_cast<CacheBlk *>(sets[i][j]);
+            if (blk->isValid() &&
+                plc->getAddrField(regenerateAddr(blk->tag, NULL)) ==
+                addrField)
+            {
+                evict_blks.push_back(blk);
+            }
         }
     }
-    return entries;
+    return;
 }
 
-bool
-DSCP::accessSector(int secId)
+int DSCP::getVictimSector(const PacketPtr pkt, Stats::Vector& contributions,
+    Stats::Scalar& totalContribution, Stats::VResult miss_rate) const
 {
-    /**
-     * TODO: suppose the sector exists and so do the promotion.
-     */
-    // the PLC is enabled
-    return true;
-}
-
-int
-DSCP::getVictimSector(Stats::Vector& contributions) const
-{
-    // The replacement is expensive since it takes O(n) get the victim
-    // sector and erase entries.
-    double minContr = 2147483647;
-    int victim = -1;
-    for (int i = 0; i < contributions.size(); i++) {
-        if (!plc->getSC(i)) {
-            // TODO: find a mostly-unused sector
-            return i;
+    //TEMP
+    double minContr = contributions[0].value();
+    double totalContri = totalContribution.value();
+    int secId = 0;
+    double tolerance = totalContri / contributions.size() * 0.7;
+    bool unbalancedEnough = false;
+    for (int i = 1; i < contributions.size(); i++)
+    {
+        if (minContr > contributions[i].value()) {
+            secId = i;
+            minContr = contributions[i].value();
         }
-        double contr = contributions[i].value();
-        if (contr < minContr) {
-            minContr = contr;
-            victim = i;
-        }
+        unbalancedEnough |= (minContr < tolerance);
     }
-    return victim;
+
+    if (unbalancedEnough)
+        return secId;
+    return random_mt.random<unsigned>(0, contributions.size() - 1);
 }
 
 DSCP *

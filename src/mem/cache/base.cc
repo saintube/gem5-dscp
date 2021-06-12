@@ -1040,7 +1040,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 
     // Access block in the tags
     Cycles tag_latency(0);
-    blk = tags->accessBlock(pkt->getAddr(), pkt->isSecure(), tag_latency);
+    blk = tags->accessBlock(pkt->getAddr(), pkt->isSecure(), tag_latency, pkt);
 
     DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
             blk ? "hit " + blk->print() : "miss");
@@ -1429,8 +1429,10 @@ BaseCache::allocateBlock(const PacketPtr pkt, PacketList &writebacks)
 
     // Find replacement victim
     std::vector<CacheBlk*> evict_blks;
+    Stats::VResult miss_rate;
+    stats.overallMissRate.result(miss_rate);
     CacheBlk *victim = tags->findVictim(addr, is_secure, blk_size_bits,
-                                        evict_blks);
+                                        evict_blks, pkt, miss_rate);
 
     // It is valid to return nullptr if there is no victim
     if (!victim)

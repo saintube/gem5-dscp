@@ -122,7 +122,8 @@ class BaseSetAssoc : public BaseTags
      * @param lat The latency of the tag lookup.
      * @return Pointer to the cache block if found.
      */
-    CacheBlk* accessBlock(Addr addr, bool is_secure, Cycles &lat) override
+    CacheBlk* accessBlock(Addr addr, bool is_secure, Cycles &lat,
+        const PacketPtr pkt) override
     {
         CacheBlk *blk = findBlock(addr, is_secure);
 
@@ -165,7 +166,9 @@ class BaseSetAssoc : public BaseTags
      */
     CacheBlk* findVictim(Addr addr, const bool is_secure,
                          const std::size_t size,
-                         std::vector<CacheBlk*>& evict_blks) override
+                         std::vector<CacheBlk*>& evict_blks,
+                         const PacketPtr pkt,
+                         Stats::VResult miss_rate) override
     {
         // Get possible entries to be victimized
         const std::vector<ReplaceableEntry*> entries =

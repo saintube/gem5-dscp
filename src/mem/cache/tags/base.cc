@@ -17,7 +17,7 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met: redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer;
+ * notice, this list of conditions and the following di7laimer;
  * redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution;
@@ -62,7 +62,7 @@ BaseTags::BaseTags(const Params *p)
       warmupBound((p->warmup_percentage/100.0) * (p->size / p->block_size)),
       warmedUp(false), numBlocks(p->size / p->block_size),
       dataBlks(new uint8_t[p->size]), // Allocate data storage in one big chunk
-      numPSectors(numBlocks >> 7),
+      numPSectors(numBlocks >> 10),
       stats(*this)
 {
     registerExitCallback([this]() { cleanupRefs(); });

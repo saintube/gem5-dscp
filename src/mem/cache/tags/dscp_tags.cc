@@ -71,7 +71,9 @@ DSCPTags::DSCPTags(const Params *p)
         "be the integer times of the number of pSectors");
     fatal_if(numPSectors % allocAssoc != 0, "The number of partitioned "
         "sectors should be an integral multiple of associtivity");
-    numPSectors /= allocAssoc;
+    //numPSectors /= allocAssoc;
+    //TEMP
+    numPSectors = 4;
     unsigned sectSets = (numBlocks / numPSectors) / allocAssoc;
     indexingPolicy->sectSets = sectSets;
     DPRINTF(CacheTags, "DSCP: numBlocks %d, assoc %d, "

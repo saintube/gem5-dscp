@@ -285,7 +285,9 @@ class BaseTags : public ClockedObject
      */
     virtual CacheBlk* findVictim(Addr addr, const bool is_secure,
                                  const std::size_t size,
-                                 std::vector<CacheBlk*>& evict_blks) = 0;
+                                 std::vector<CacheBlk*>& evict_blks,
+                                 const PacketPtr pkt,
+                                 Stats::VResult miss_rate) = 0;
 
     /**
      * Access block and update replacement data. May not succeed, in which case
@@ -298,7 +300,8 @@ class BaseTags : public ClockedObject
      * @param lat The latency of the tag lookup.
      * @return Pointer to the cache block if found.
      */
-    virtual CacheBlk* accessBlock(Addr addr, bool is_secure, Cycles &lat) = 0;
+    virtual CacheBlk* accessBlock(Addr addr, bool is_secure, Cycles &lat,
+                                  const PacketPtr pkt) = 0;
 
     /**
      * Generate the tag from the given address.

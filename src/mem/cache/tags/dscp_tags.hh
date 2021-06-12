@@ -88,7 +88,7 @@ class DSCPTags : public BaseTags
     BaseReplacementPolicy *replacementPolicy;
 
     /** The maximal of contribution */
-    const double MAX_CONTRIBUTION = 16384;
+    const double MAX_CONTRIBUTION = 1024;
 
   public:
     /** Convenience typedef. */
@@ -128,7 +128,8 @@ class DSCPTags : public BaseTags
      * @param lat The latency of the tag lookup.
      * @return Pointer to the cache block if found.
      */
-    CacheBlk* accessBlock(Addr addr, bool is_secure, Cycles &lat) override
+    CacheBlk* accessBlock(Addr addr, bool is_secure, Cycles &lat,
+                          const PacketPtr pkt) override
     {
         CacheBlk *blk = findBlock(addr, is_secure);
 
@@ -146,6 +147,9 @@ class DSCPTags : public BaseTags
 
         // If a cache hit
         if (blk != nullptr) {
+            //TEMP
+            indexingPolicy->plc->accessSector(addr, true);
+
             // Update number of references to accessed block
             blk->refCount++;
 
@@ -173,6 +177,28 @@ class DSCPTags : public BaseTags
         return blk;
     }
 
+    //TEMP
+    int unbalanced(const PacketPtr pkt, Stats::VResult miss_rate) {
+        if (std::isnan(miss_rate[pkt->requestorId()]) ||
+            miss_rate[pkt->requestorId()] < 0.25 ||
+            stats.contributions.size() <= 0) // 1 / valid_requestor.size
+            return -1;
+        double minContr = stats.contributions[0].value();
+        double totalContri = stats.totalContribution.value();
+        int secId = 0;
+        double tolerance = totalContri / stats.contributions.size() * 0.8;
+        for (int i = 1; i < stats.contributions.size(); i++)
+        {
+            if (minContr > stats.contributions[i].value()) {
+                secId = i;
+                minContr = stats.contributions[i].value();
+            }
+        }
+        if (minContr < tolerance)
+            return secId;
+        return -1;
+}
+
     /**
      * Find replacement victim based on address. The list of evicted blocks
      * only contains the victim.
@@ -185,37 +211,84 @@ class DSCPTags : public BaseTags
      */
     CacheBlk* findVictim(Addr addr, const bool is_secure,
                          const std::size_t size,
-                         std::vector<CacheBlk*>& evict_blks) override
+                         std::vector<CacheBlk*>& evict_blks,
+                         const PacketPtr pkt,
+                         Stats::VResult miss_rate) override
     {
         // Lookup PLC
-        // DPRINTF(CacheTags, "DSCP: lookup PLC for addr %d\n", addr);
         int secId = indexingPolicy->plc->getSector(addr);
+        // DPRINTF(CacheTags, "DSCP: lookup PLC for addr %d, get secId %d\n",
+        //         addr, secId);
         if (secId < 0) {
             // PLC misses, then evict lines in the Victim Sector
-            int victimSecId = indexingPolicy->getVictimSector(
-                stats.contributions);
-            // DPRINTF(CacheTags, "DSCP: get victim sector %d\n", victimSecId);
+            unsigned victimAddrField = -1;
+            int victimSecId = indexingPolicy->getVictimSector(pkt,
+                stats.contributions, stats.totalContribution, miss_rate);
+            //DPRINTF(CacheTags, "DSCP: get victim sector %d\n", victimSecId);
             if (indexingPolicy->plc->isFull()) {
                 // require PLC replacement
-                std::vector<CacheBlk*> plcVictims =
-                    indexingPolicy->getSectorSets(victimSecId);
-                evict_blks.insert(evict_blks.end(), plcVictims.begin(),
-                    plcVictims.end());
-                DPRINTF(CacheTags, "DSCP: replace victim sector %d, evict %d "
-                    "sets\n", victimSecId, plcVictims.size());
-                indexingPolicy->plc->deletePLCEntry(victimSecId);
+                // actually returns a addField
+                victimAddrField = indexingPolicy->plc->getVictimEntry(
+                    victimSecId);
+                indexingPolicy->getSectorSets(victimSecId, victimAddrField,
+                    evict_blks);
+                DPRINTF(CacheTags, "DSCP: replace victim addrField %d and map"
+                    " sector %d, evict %d blks\n", victimAddrField,
+                    victimSecId, evict_blks.size());
+                indexingPolicy->plc->deletePLCEntry(victimAddrField);
+                fatal_if(indexingPolicy->plc->isFull(), "plc should not be"
+                    "full after entry deletion");
             }
             secId = victimSecId;
             indexingPolicy->plc->setPLCEntry(addr, secId);
-        } else {
-            /**
-             * TODO: update replacement info for a hit (touch)
-             */
-            // DPRINTF(CacheTags, "DSCP: PLC hit for addr %d\n", addr);
+        } else if (stats.totalContribution.value() == MAX_CONTRIBUTION - 1 &&
+            indexingPolicy->plc->isFull()) {
+            int victimSecId = unbalanced(pkt, miss_rate);
+            if (victimSecId >= 0) { // unbalanced!
+                DPRINTF(CacheTags, "DSCP: unbalanced! low-contribution sector"
+                    " %d\n", victimSecId);
+                fatal_if(victimSecId >= 4, "invalid sector id %d, "
+                    "contributions size %d", victimSecId,
+                    stats.contributions.size());
+                unsigned victimAddrField = indexingPolicy->plc->getVictimEntry(
+                    victimSecId);
+                if (indexingPolicy->plc->getAddrField(
+                    addr) != victimAddrField) { // should not wb hit's entry
+                    std::vector<CacheBlk*> tmp_blks;
+                    indexingPolicy->getSectorSets(victimSecId, victimAddrField,
+                        tmp_blks);
+                    int tolerance_blks = 8;
+                    fatal_if(stats.totalContribution.value() <= 0,
+                        "invalid rebalance period!");
+                    double rate = stats.contributions[victimSecId].value() *
+                        numPSectors / stats.totalContribution.value();
+                    rate = 1 / (1 - rate) * 8;
+                    tolerance_blks += ((int)rate & 0x18);
+                    if (tmp_blks.size() <= tolerance_blks) {// evict less blks
+                        DPRINTF(CacheTags, "DSCP: unbalanced! replace victim "
+                            "addrField %d and evict %d blks\n",
+                            victimAddrField, tmp_blks.size());
+                        evict_blks.assign(tmp_blks.begin(), tmp_blks.end());
+                        indexingPolicy->plc->deletePLCEntry(victimAddrField);
+                        fatal_if(indexingPolicy->plc->isFull(), "plc should "
+                            "not be full after entry deletion");
+                    }
+                }
+            }
         }
         // Promotion
-        // bool res = indexingPolicy->accessSector(secId);
-        indexingPolicy->accessSector(secId);
+        // bool isLow = stats.totalContribution.value() >= 2048 &&
+        //     !std::isnan(miss_rate[pkt->requestorId()])
+        RequestorID rid = pkt->requestorId();
+        bool isLow = stats.totalRefs.value() >= 1000000
+            &&!std::isnan(miss_rate[rid])
+            && stats.occupancies[rid].value() > 0.2
+            && stats.occupancies[rid].value() < 0.9
+            && miss_rate[rid] > 0.5;
+        isLow = false;
+        if (isLow)
+            DPRINTF(CacheTags, "DSCP: isLow! addr %d", addr);
+        indexingPolicy->plc->accessSector(addr, isLow);
 
         // Get possible entries to be victimized
         const std::vector<ReplaceableEntry*> entries =
